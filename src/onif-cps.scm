@@ -21,6 +21,11 @@
                 operator))
           (else #f)))
 
+      (define (%onif-symbol sym onif-symbol-hash)
+        (cond 
+          ((hash-table-ref onif-symbol-hash sym) => cadr)
+          (else #f)))
+
       (define (%lambda-operator? operator onif-symbol-hash)
         (cond
           ((not (onif-symbol? operator)) #f)
@@ -40,7 +45,7 @@
             (let ((cps-symbol (onif-symbol)))
               (list
                  (list
-                   'lambda
+                   (%onif-symbol 'lambda onif-symbol-hash)
                    (cons cps-symbol (cadr expression))
                   (%cps-conv
                     (car (cddr expression))
