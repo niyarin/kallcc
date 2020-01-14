@@ -3,7 +3,7 @@
    (import (scheme base)
            (scheme case-lambda))
 
-   (export onif-symbol onif-symbol?)
+   (export onif-symbol onif-symbol? onif-symbol->symbol)
    (begin
 
      (define *id-counter* 0)
