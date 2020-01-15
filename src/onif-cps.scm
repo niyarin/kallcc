@@ -90,8 +90,8 @@
          (let ((test-const-exp
                  (%onif-not-have-continuation? (cadr scm-code) onif-symbol-hash)))
            (if test-const-exp
-             (list ;(car scm-code) ;DEBUG
-               'IF
+             (list
+                   (car scm-code)
                    (car test-const-exp)
                    (%cps-conv (list-ref scm-code 2) stack onif-symbol-hash)
                    (%cps-conv (list-ref scm-code 3) stack onif-symbol-hash))

@@ -22,7 +22,6 @@
    (begin
 
      (define (%ref-environment-prefix sym prefix-symbol)
-
        )
 
      (define (%rename-symbol sym)
@@ -33,17 +32,15 @@
            (hash-table-ref global symbol)
            (list 'undefined symbol)))
 
-
-
      (define (%local-cell-lookup symbol local-cell)
        (cond
          ((assv local-cell symbol) => cadr)
-         (else 
+         (else
            #f)))
 
      (define (%lookup-environment symbol global stack )
          (let loop ((stack stack))
-            (cond 
+            (cond
               ((null? stack)
                (%global-lookup symbol global))
               ((%local-cell-lookup symbol (car stack)))
@@ -56,16 +53,35 @@
           ;error
           ))
 
-     (define (%expand-environment-syntax-symbol-hash-ref symbol expand-environment )
-       (let ((symbol-hash (%expand-environment-ref 'syntax-symbol-hash  expand-environment)))
+     (define (%expand-environment-syntax-symbol-hash-ref
+               symbol
+               expand-environment)
+       (let ((symbol-hash
+               (%expand-environment-ref
+                 'syntax-symbol-hash 
+                 expand-environment)))
          (hash-table-ref symbol-hash symbol)))
+
+     (define (%list-expand-if scm-code global stack expand-environment)
+       (cons 
+         (cadr (%expand-environment-syntax-symbol-hash-ref
+                  'if
+                  expand-environment))
+         (map
+           (lambda (expression)
+             (onif-expand
+               expression
+               global
+               stack
+               expand-environment))
+         (cdr scm-code))))
 
      (define (%list-expand-lambda scm-code global stack expand-environment)
        (let* ((bodies
                 (map (lambda (expression)
-                       (onif-expand 
+                       (onif-expand
                          expression
-                         global 
+                         global
                          stack
                          expand-environment))
                      (cddr scm-code)))
@@ -74,19 +90,20 @@
                  (car bodies)
                  (cons
                    (cadr
-                      (%expand-environment-syntax-symbol-hash-ref 
+                      (%expand-environment-syntax-symbol-hash-ref
                         'begin
                         expand-environment))
                    bodies))))
           (list
             (cadr
-               (%expand-environment-syntax-symbol-hash-ref 
+               (%expand-environment-syntax-symbol-hash-ref
                      'lambda
                      expand-environment))
             (cadr scm-code)
             body)))
 
      (define (%list-expand operator scm-code global stack expand-environment)
+        "operator is pair. example. (built-in-lambda . ONIF-SYMBOL)"
          (let ((operator-kind (car operator)))
            (case operator-kind
               ((built-in-lambda);LAMBDA
@@ -95,8 +112,14 @@
                  global
                  stack
                  expand-environment))
+              ((built-in-if)
+               (%list-expand-if
+                 scm-code
+                 global
+                 stack
+                 expand-environment))
               (else ;FUNC RUN
-                  (map 
+                  (map
                     (lambda (expression)
                       (onif-expand
                         expression
@@ -106,7 +129,8 @@
                   scm-code)))))
 
      (define (onif-expand scm-code global stack expand-environment)
-         (cond 
+        "global is scheme hash."
+         (cond
            ((and (pair? scm-code) (symbol? (car scm-code)))
             (let ((operator (%lookup-environment (car scm-code) global stack)))
                (%list-expand operator scm-code global stack expand-environment)))
@@ -116,6 +140,6 @@
              scm-code)))
 
      (define (onif-expand-environment)
-         `((syntax-symbol-hash 
-             ,(onif-scm-env-tiny-core))) )
+         `((syntax-symbol-hash
+             ,(onif-scm-env-tiny-core))))
      ))
