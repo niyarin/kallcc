@@ -1,11 +1,11 @@
 (include "./onif-symbol.scm")
 (include "./onif-idebug.scm")
+(include "./onif-misc.scm")
 
 (define-library (onif meta-lambda)
    (import (scheme base)
-           (srfi 125);scheme hash
            (onif idebug)
-           (scheme write)
+           (onif misc)
            (onif symbol))
    (export onif-meta-lambda-conv
            onif-meta-lambda-test-%make-meta-info)
@@ -14,17 +14,16 @@
      (define (%lambda-operator? operator onif-symbol-hash)
         (cond
           ((not (onif-symbol? operator)) #f)
-          ((eq? (cadr (hash-table-ref onif-symbol-hash 'lambda))
+          ((eq? (onif-misc/onif-symbol-hash-ref onif-symbol-hash 'lambda)
                 operator))
           (else #f)))
 
      (define (%if-operator? operator onif-symbol-hash)
         (cond
           ((not (onif-symbol? operator)) #f)
-          ((eq? (cadr (hash-table-ref onif-symbol-hash 'if))
+          ((eq? (onif-misc/onif-symbol-hash-ref onif-symbol-hash 'if)
                 operator))
           (else #f)))
-
 
      (define (%make-meta-info . options)
          (let ((stack 
@@ -39,19 +38,12 @@
                     (append (apply append stack)
                             formals)))))
 
-     (define  (onif-meta-lambda-test-%make-meta-info)
-         (display (%make-meta-info 
-                    '(stack ((a b) (c d) (e)))
-                    '(formals (x y z)))))
-
      (define (%conv-meta-lambda cps-code onif-symbol-hash stk onif-expand-env)
        (cond 
          ((not (pair? cps-code)) cps-code)
          ((%lambda-operator? (car cps-code) onif-symbol-hash)
           (let ((new-stk (cons (cadr cps-code) stk)))
-            `(,(cadr (hash-table-ref
-                    onif-symbol-hash
-                   'lambda-META))
+            `(,(onif-misc/onif-symbol-hash-ref onif-symbol-hash 'lambda-META)
              ,(cadr cps-code)
              ,(%make-meta-info 
                `(stack ,stk)
@@ -73,5 +65,4 @@
          cps-code
          onif-symbol-hash
          '()
-         onif-expand-env-with-name-id))
-     ))
+         onif-expand-env-with-name-id))))

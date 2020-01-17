@@ -49,10 +49,7 @@
                       (list id new-lambda)
                       (car lambdas-box)))
                (list
-                 (cadr
-                  (hash-table-ref
-                    symbol-hash
-                   'LFUN))
+                 (onif-misc/onif-symbol-hash-ref symbol-hash 'LFUN)
                   id
                   ))))
          (else 

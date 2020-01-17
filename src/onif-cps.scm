@@ -1,9 +1,10 @@
 (include "./onif-symbol.scm")
+(include "./onif-misc.scm")
 
 (define-library (onif cps)
    (import (scheme base)
            (scheme cxr)
-           (srfi 125) ;SCHEME HASH
+           (onif misc)
            (srfi 1);SCHEME LIST
            (onif symbol))
    (export onif-cps-conv)
@@ -17,19 +18,14 @@
       (define (%if-operator? operator onif-symbol-hash)
         (cond
           ((not (onif-symbol? operator)) #f)
-          ((eq? (cadr (hash-table-ref onif-symbol-hash 'if))
+          ((eq? (onif-misc/onif-symbol-hash-ref onif-symbol-hash 'if)
                 operator))
-          (else #f)))
-
-      (define (%onif-symbol sym onif-symbol-hash)
-        (cond 
-          ((hash-table-ref onif-symbol-hash sym) => cadr)
           (else #f)))
 
       (define (%lambda-operator? operator onif-symbol-hash)
         (cond
           ((not (onif-symbol? operator)) #f)
-          ((eq? (cadr (hash-table-ref onif-symbol-hash 'lambda))
+          ((eq? (onif-misc/onif-symbol-hash-ref onif-symbol-hash 'lambda)
                 operator))
           (else #f)))
 
@@ -45,7 +41,7 @@
             (let ((cps-symbol (onif-symbol)))
               (list
                  (list
-                   (%onif-symbol 'lambda onif-symbol-hash)
+                   (onif-misc/onif-symbol-hash-ref onif-symbol-hash 'lambda)
                    (cons cps-symbol (cadr expression))
                   (%cps-conv
                     (car (cddr expression))
