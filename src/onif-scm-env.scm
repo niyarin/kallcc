@@ -27,7 +27,10 @@
               (quote . (built-in-set! ,(onif-symbol 'QUOTE)))
               (define-syntax . (built-in-set! ,(onif-symbol 'DEFINE-SYNTAX)))
               (let-syntax . (built-in-set! ,(onif-symbol 'LET-SYNTAX)))
-              (begin . (built-in-begin ,(onif-symbol 'SET!))))))))
+              (begin . (built-in-begin ,(onif-symbol 'SET!)))
+              (DEFUN . (internal-defun-operator ,(onif-symbol 'DEFUN-INTERNAL)))
+              (LFUN . (internal-lfun-operator ,(onif-symbol 'LFUN-INTERNAL)))
+              )))))
 
      (define (onif-scm-env-tiny-core)
          (alist->hash-table
