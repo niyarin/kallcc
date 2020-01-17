@@ -1,32 +1,21 @@
-(include "./onif-idebug.scm")
+(include "./onif-misc.scm")
 
 (define-library (onif flat-lambda)
    (import (scheme base)
            (scheme cxr)
-           (onif idebug)(scheme write)
            (srfi 125);scheme hash
+           (onif misc)
            (onif symbol))
    (export onif-flat-flat-code&id-lambdas) 
    (begin
-     (define (%lambda-operator? operator onif-symbol-hash)
-        (cond
-          ((not (onif-symbol? operator)) #f)
-          ((eq? (cadr (hash-table-ref onif-symbol-hash 'lambda))
-                operator))
-          (else #f)))
-     (define (%lambda-meta-operator? operator onif-symbol-hash)
-        (cond
-          ((not (onif-symbol? operator)) #f)
-          ((eq? (cadr (hash-table-ref onif-symbol-hash 'lambda-META))
-                operator))
-          (else #f)))
-     (define (%if-operator? operator onif-symbol-hash)
-        (cond
-          ((not (onif-symbol? operator)) #f)
-          ((eq? (cadr (hash-table-ref onif-symbol-hash 'if))
-                operator))
-          (else #f)))
+     (define %lambda-operator?
+       (onif-misc/make-check-onif-symbol-base-function 'lambda))
 
+     (define %lambda-meta-operator?
+       (onif-misc/make-check-onif-symbol-base-function 'lambda-META))
+
+     (define %if-operator?
+       (onif-misc/make-check-onif-symbol-base-function 'if))
 
      (define (%flat-conv 
                code 
