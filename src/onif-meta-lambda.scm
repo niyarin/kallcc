@@ -4,26 +4,22 @@
 
 (define-library (onif meta-lambda)
    (import (scheme base)
+           (scheme list);SRFI 1
+           (scheme cxr)
            (onif idebug)
            (onif misc)
            (onif symbol))
-   (export onif-meta-lambda-conv
-           onif-meta-lambda-test-%make-meta-info)
+   (export onif-meta-lambda-conv)
 
    (begin
-     (define (%lambda-operator? operator onif-symbol-hash)
-        (cond
-          ((not (onif-symbol? operator)) #f)
-          ((eq? (onif-misc/onif-symbol-hash-ref onif-symbol-hash 'lambda)
-                operator))
-          (else #f)))
+    (define %lambda-operator?
+       (onif-misc/make-check-onif-symbol-base-function 'lambda))
 
-     (define (%if-operator? operator onif-symbol-hash)
-        (cond
-          ((not (onif-symbol? operator)) #f)
-          ((eq? (onif-misc/onif-symbol-hash-ref onif-symbol-hash 'if)
-                operator))
-          (else #f)))
+    (define %if-operator?
+       (onif-misc/make-check-onif-symbol-base-function 'if))
+
+     (define %lambda-meta-operator?
+       (onif-misc/make-check-onif-symbol-base-function 'lambda-META))
 
      (define (%make-meta-info . options)
          (let ((stack 
@@ -31,28 +27,48 @@
                (base 
                  (cond ((assq 'base options) => cadr)(else #f)))
                (formals 
-                 (cond ((assq 'formals options) => cadr )(else '()))))
-
+                 (cond ((assq 'formals options) => cadr )(else '())))
+               (contain-symbols
+                 (cond ((assq 'contain-symbols options) => cadr )(else '()))))
             (list 
               (list 'bind-names 
                     (append (apply append stack)
-                            formals)))))
+                            formals))
+              (list 'contain-symbols contain-symbols))))
 
      (define (%conv-meta-lambda cps-code onif-symbol-hash stk onif-expand-env)
        (cond 
          ((not (pair? cps-code)) cps-code)
          ((%lambda-operator? (car cps-code) onif-symbol-hash)
-          (let ((new-stk (cons (cadr cps-code) stk)))
+          (let* ((new-stk (cons (cadr cps-code) stk))
+                 (new-body
+                   (map 
+                      (lambda (body)
+                        (%conv-meta-lambda 
+                          body
+                          onif-symbol-hash
+                          new-stk
+                          onif-expand-env))
+                      (cddr cps-code)))
+                 (symbol-list
+                   (map 
+                     (lambda (x)
+                       (if (and (pair? x)
+                                (%lambda-meta-operator? (car x) onif-symbol-hash))
+                         (cadr (assq 'contain-symbols (caddr x)))
+                         '()))
+                     (apply append 
+                            (filter list? new-body))))
+                 (contain-symbols
+                   (apply append (cons (cadr cps-code) symbol-list))))
             `(,(onif-misc/onif-symbol-hash-ref onif-symbol-hash 'lambda-META)
              ,(cadr cps-code)
              ,(%make-meta-info 
                `(stack ,stk)
-               `(formals ,(cadr cps-code)))
+               `(formals ,(cadr cps-code))
+               `(contain-symbols  ,contain-symbols))
              .
-             ,(map 
-               (lambda (body)
-                 (%conv-meta-lambda body onif-symbol-hash new-stk onif-expand-env))
-               (cddr cps-code)))))
+             ,new-body)))
          (else 
            (map 
               (lambda (x)
