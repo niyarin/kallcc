@@ -1,10 +1,13 @@
 (include "./onif-symbol.scm")
 (include "./onif-misc.scm")
+(include "./onif-idebug.scm")
 
 (define-library (onif cps)
    (import (scheme base)
            (scheme cxr)
+           (scheme write);
            (onif misc)
+           (onif idebug)
            (srfi 1);SCHEME LIST
            (onif symbol))
    (export onif-cps-conv)
@@ -121,4 +124,4 @@
                (%cps-conv-frun scm-code stack onif-symbol-hash)))))
 
       (define (onif-cps-conv scm-code onif-symbol-hash)
-        (%cps-conv scm-code '() onif-symbol-hash))))
+        (%cps-conv scm-code '((() #f)) onif-symbol-hash))))
