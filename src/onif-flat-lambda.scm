@@ -28,10 +28,7 @@
           code)
          ((%lambda-meta-operator? (car code) symbol-hash);<= ONLY body is 1.
             (let* ((id (car offset-box))
-                   (_ (set-car! 
-                        offset-box
-                        (+ id 1)))
-
+                   (_ (set-car!  offset-box (+ id 1)))
                    (new-body (%flat-conv 
                                (cadddr code)
                                lambdas-box
@@ -48,10 +45,9 @@
                     (cons
                       (list id new-lambda)
                       (car lambdas-box)))
-               (list
-                 (onif-misc/onif-symbol-hash-ref symbol-hash 'LFUN)
-                  id
-                  ))))
+                  (list
+                    (onif-misc/onif-symbol-hash-ref symbol-hash 'LFUN)
+                    id))))
          (else 
            (map 
              (lambda (x)
@@ -61,8 +57,7 @@
                  offset-box
                  symbol-hash
                  expand-environment))
-             code))
-         ))
+             code))))
 
      (define (onif-flat-flat-code&id-lambdas 
                code

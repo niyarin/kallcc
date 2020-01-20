@@ -9,7 +9,10 @@
            (onif idebug)
            (onif misc)
            (onif symbol))
-   (export onif-meta-lambda-conv)
+   (export onif-meta-lambda-conv
+           onif-meta-lambda/update-meta-info
+           onif-meta-lambda/update-body
+           onif-meta-lambda/update-meta-info-body)
 
    (begin
     (define %lambda-operator?
@@ -35,6 +38,31 @@
                     (append (apply append stack)
                             formals))
               (list 'contain-symbols contain-symbols))))
+
+     (define (onif-meta-lambda/update-meta-info meta-lambda-code key val)
+        (list
+         (car meta-lambda-code)
+         (cadr meta-lambda-code)
+         (cons 
+           (list key val)
+           (caddr meta-lambda-code))
+         (cadddr meta-lambda-code)))
+
+     (define (onif-meta-lambda/update-body meta-lambda-code new-body)
+       (list
+         (car meta-lambda-code)
+         (cadr meta-lambda-code)
+         (caddr meta-lambda-code)
+         new-body))
+
+     (define (onif-meta-lambda/update-meta-info-body meta-lambda-code key val new-body)
+       (list
+         (car meta-lambda-code)
+         (cadr meta-lambda-code)
+         (cons
+            (list key val)
+            (caddr meta-lambda-code))
+         new-body))
 
      (define (%conv-meta-lambda cps-code onif-symbol-hash stk onif-expand-env)
        (cond 
@@ -73,8 +101,7 @@
            (map 
               (lambda (x)
                 (%conv-meta-lambda x onif-symbol-hash stk onif-expand-env))
-              cps-code))
-         ))
+              cps-code))))
 
      (define (onif-meta-lambda-conv  cps-code onif-symbol-hash onif-expand-env-with-name-id)
        (%conv-meta-lambda
