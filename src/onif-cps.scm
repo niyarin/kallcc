@@ -64,8 +64,9 @@
                       (car scm-code)
                       (cons
                         (if (cadar stack)
-                          `(lambda (,(caar stack))
-                                   ,(%cps-conv (cadar stack) (cdr stack) onif-symbol-hash))
+                          `(,(onif-misc/onif-symbol-hash-ref onif-symbol-hash 'lambda)
+                             (,(caar stack))
+                              ,(%cps-conv (cadar stack) (cdr stack) onif-symbol-hash))
                            (caar stack))
                           (cdr scm-code))))
                    ((%onif-not-have-continuation?
