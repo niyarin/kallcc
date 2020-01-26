@@ -109,8 +109,8 @@
                   onif-symbol-hash))))))
 
       (define (%cps-conv scm-code stack onif-symbol-hash)
-        (let ((const-val (%onif-not-have-continuation? 
-                           scm-code 
+        (let ((const-val (%onif-not-have-continuation?
+                           scm-code
                            onif-symbol-hash)))
            (cond
               ((and (not (null? stack))
