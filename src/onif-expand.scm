@@ -63,7 +63,7 @@
          (hash-table-ref symbol-hash symbol)))
 
      (define (%list-expand-if scm-code global stack expand-environment)
-       (cons 
+       (cons
          (cadr (%expand-environment-syntax-symbol-hash-ref
                   'if
                   expand-environment))
@@ -74,7 +74,7 @@
                global
                stack
                expand-environment))
-         (cdr scm-code))))
+           (cdr scm-code))))
 
      (define (%list-expand-lambda scm-code global stack expand-environment)
        (let* ((bodies
@@ -118,6 +118,17 @@
                  global
                  stack
                  expand-environment))
+              ((built-in-car built-in-cdr built-in-cons)
+               (cons
+                 (cadr operator)
+                 (map
+                    (lambda (expression)
+                      (onif-expand
+                        expression
+                        global
+                        stack
+                        expand-environment))
+                     (cdr scm-code))))
               (else ;FUNC RUN
                   (map
                     (lambda (expression)
