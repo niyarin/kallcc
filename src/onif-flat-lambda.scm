@@ -7,6 +7,7 @@
            (onif idebug)
            (only (scheme list) filter)
            (srfi 125);scheme hash
+           (onif meta-lambda)
            (onif misc)
            (onif symbol))
    (export onif-flat-flat-code&id-lambdas)
@@ -55,10 +56,12 @@
                            prev-contain-symbols
                            (cadr (assq 'contain-symbols (caddr code))))
                         (cadr code)))
-                   (new-lambda (list (car code);OPE
-                                     (cadr code);FORMALS
-                                     (caddr code);META INFO
-                                     new-body)))
+                   (new-lambda
+                     (onif-meta-lambda/update-meta-info-body
+                       code
+                       'closure-env-symbols
+                       contain-symbols
+                       new-body)))
                (begin
                   (set-car!
                     lambdas-box
