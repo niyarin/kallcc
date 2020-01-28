@@ -8,18 +8,26 @@
            (onif meta-lambda))
    (export name-ids/make-name-local-ids)
    (begin
-     (define (%make-name-local-ids code bind-vars onif-symbol-hash)
+     (define (%make-name-local-ids bind-vars)
+       (let loop ((i 0)
+                  (vars bind-vars)
+                  (res '()))
+         (if (null? vars)
+           res
+           (loop
+             (+ i 1)
+             (cdr vars)
+             (cons (list (car vars) i) res)))))
+
+     (define (%add-meta-info-name-local-ids code bind-vars onif-symbol-hash)
       (cond
          ((not (pair? code)) code)
          ((onif-misc/lambda-meta-operator? (car code) onif-symbol-hash)
           (let* ((bind-vars (append (cadr code) bind-vars))
                  (name-ids
-                   (do ((vars bind-vars (cdr vars))
-                        (res '() (cons (list (car vars) id) res))
-                        (id 0 (+ id 1)))
-                     ((null? vars) res)))
+                   (%make-name-local-ids bind-vars))
                  (new-body
-                   (%make-name-local-ids
+                   (%add-meta-info-name-local-ids
                      (cadddr code)
                      bind-vars
                      onif-symbol-hash)))
@@ -31,8 +39,8 @@
          (else
            (map
              (lambda (x)
-                 (%make-name-local-ids x bind-vars onif-symbol-hash))
+                 (%add-meta-info-name-local-ids x bind-vars onif-symbol-hash))
              code))))
 
      (define (name-ids/make-name-local-ids code onif-symbol-hash)
-      (%make-name-local-ids code '()  onif-symbol-hash))))
+      (%add-meta-info-name-local-ids code '()  onif-symbol-hash))))
