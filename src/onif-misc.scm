@@ -34,7 +34,7 @@
        (if (not (onif-symbol? operator))
          #f
          (case (onif-symbol/ref-symbol operator)
-            ((CONS CAR CDR PAIR?))
+            ((CONS CAR CDR PAIR?)
+             => (lambda (x) x))
             (else
-              #f))))
-     ))
+              #f))))))
