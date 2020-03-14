@@ -7,10 +7,10 @@
            (srfi 125) ;SCHEME HASH
            (srfi 127)
            (onif utils))
-   (export onif-alpha-conv!)
+   (export onif-alpha/conv!)
    (begin
       (define (%onif-symbol sym onif-symbol-hash)
-        (cond 
+        (cond
           ((hash-table-ref onif-symbol-hash sym) => cadr)
           (else #f)))
 
@@ -25,25 +25,31 @@
        (let ((res
                    (lseq-filter
                      (lambda (x) (not (null? x)))
-                      (lseq-map 
+                      (lseq-map
                         (lambda (s)
                           (assv symbol s))
                         stk))))
          (if (null? res)
            #f
            (lseq-car res))))
-         
+
      (define (%symbol-conv symbol stk)
-       (cond 
+       (cond
          ((%lookup-stack symbol stk)
-          => (lambda (x) 
+          => (lambda (x)
                (lseq-car (lseq-cdr x))))
          (else symbol)))
-       
-     (define (onif-alpha-conv! code onif-symbol-hash)
+
+     (define (onif-alpha/conv! code onif-symbol-hash
+                               . optional-inital-stack)
        (let loop ((code code)
-                  (stk '()))
-         (cond 
+                  (stk (cond
+                         ((null? optional-inital-stack) '())
+                         ((list? (car optional-inital-stack))
+                          (car optional-inital-stack))
+                         (else
+                           (error "optional-inital-stack must be list")))))
+         (cond
            ((symbol? code)
             (%symbol-conv code stk))
            ((not (list? code)) code)
@@ -51,7 +57,7 @@
            ((%lambda-operator? (car code) onif-symbol-hash)
             (let* ((formals (cadr code))
                    (stack-cell
-                       (map 
+                       (map
                          (lambda (x)
                             (let ((conflicted (%lookup-stack x stk)))
                               (if conflicted
@@ -68,15 +74,13 @@
                     (map
                       (lambda (body)
                          (loop body (cons stack-cell stk)))
-                      (cddr 
-                        code)))
+                      (cddr code)))
                  code)))
            (else
              (onif-utils-for-each-cell1
                (lambda (cell)
-                  (set-car! 
+                  (set-car!
                      cell
                      (loop (car cell) stk)))
                code)
-             code))))
-     ))
+             code))))))
