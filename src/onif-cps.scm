@@ -2,6 +2,15 @@
 (include "./onif-misc.scm")
 (include "./onif-idebug.scm")
 
+"
+This phase rules.
+<expression>:<lambda-expression>|<begin-expression>|<const-val>
+<lambda-expression>:(lambda (symbol ...) <expression>)
+<begin-expression>:(begin <expression 1> ... <expression N>)
+<const-val>:<symbol>|<number>|<boolean>
+"
+;TODO:next-phase (lambda (x) x) => x
+
 (define-library (onif cps)
    (import (scheme base)
            (scheme cxr)
@@ -54,11 +63,39 @@
            (else
              #f)))
 
-      (define (%cps-conv-frun scm-code stack onif-symbol-hash)
+      (define (%cps-conv-begin scm-code stack onif-symbol-hash)
+        (%cps-conv-frun scm-code stack onif-symbol-hash #t))
+
+      (define (%stack-symbol-update! stack symbol)
+        (let ((target (car stack)))
+         (set-car! (car stack) symbol)
+         (set-cdr! (car stack)
+            (map (lambda (x)
+                   (if (eq? x target)
+                     symbol
+                     x))
+                 (cdar stack)))))
+
+      (define (%begin-last-expression scm-code stack onif-symbol-hash)
+        (let ((res-val (last scm-code))
+              (begin-cont-symbol (caar stack)))
+            (cond
+              ((not (cadar stack)) res-val)
+              (else
+                (map! (lambda (x)
+                        (if (eq? x begin-cont-symbol)
+                          res-val
+                          x))
+                      (cadar stack))))))
+
+      (define (%cps-conv-frun scm-code stack onif-symbol-hash . beg-flag)
          (let* ((res-top-cell (list #f '()))
-                (res-cell res-top-cell))
+                (res-cell res-top-cell)
+                (beg-flag (if (null? beg-flag) #f (car beg-flag))))
              (let loop ((code scm-code))
                  (cond
+                   ((and (null? code) beg-flag (last-pair scm-code))
+                      (%begin-last-expression scm-code stack onif-symbol-hash))
                    ((null? code)
                     (cons
                       (car scm-code)
@@ -68,7 +105,7 @@
                              (,(caar stack))
                               ,(%cps-conv (cadar stack) (cdr stack) onif-symbol-hash))
                            (caar stack))
-                          (cdr scm-code))))
+                        (cdr scm-code))))
                    ((%onif-not-have-continuation?
                       (car code)
                       onif-symbol-hash)
@@ -82,7 +119,7 @@
                        (%cps-conv
                          (car code)
                          (cons
-                           (list new-sym (cdr res-top-cell) )
+                           (list new-sym (cdr res-top-cell))
                            stack)
                          onif-symbol-hash)))))))
 
@@ -121,8 +158,10 @@
               (const-val => car)
               ((%if-operator?  (car scm-code) onif-symbol-hash)
                   (%cps-conv-if scm-code stack onif-symbol-hash))
-             (else
-               (%cps-conv-frun scm-code stack onif-symbol-hash)))))
+              ((onif-misc/begin-operator? (car scm-code) onif-symbol-hash)
+                  (%cps-conv-begin scm-code stack onif-symbol-hash))
+              (else
+                  (%cps-conv-frun scm-code stack onif-symbol-hash)))))
 
       (define (onif-cps-conv scm-code onif-symbol-hash)
         (%cps-conv scm-code '((() #f)) onif-symbol-hash))))
