@@ -1,8 +1,8 @@
 (include "./onif-symbol.scm")
 
 (define-library (onif idebug)
-   (import (scheme base) (onif symbol) (scheme cxr))
-   (export onif-idebug-icode->code)
+   (import (scheme base) (onif symbol) (scheme cxr) (scheme write))
+   (export onif-idebug-icode->code onif-idebug/debug-display)
    (begin
      (define (%opt-ref opt key)
       (cond
@@ -53,6 +53,10 @@
                             res))))))))
           (else
            (map (lambda (x) (%icode->code x opt)) icode)))))
+
+     (define (onif-idebug/debug-display icode . opt)
+       (display
+         (onif-idebug-icode->code (cons icode opt))))
 
      (define (%icode->code/expression-conv icode opt)
        (let ((operator
