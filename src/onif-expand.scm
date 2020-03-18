@@ -17,15 +17,15 @@
      (else
          (syntax-error "This scheme imprementation is not supported.")))
 
-   (export onif-expand onif-expand-environment)
+   (export onif-expand
+           onif-expand-environment
+           onif-expand/remove-outer-begin)
 
    (begin
 
-     (define (%ref-environment-prefix sym prefix-symbol)
-       )
+     (define (%ref-environment-prefix sym prefix-symbol))
 
-     (define (%rename-symbol sym)
-       )
+     (define (%rename-symbol sym))
 
      (define (%global-lookup symbol global)
          (if (hash-table-exists? global symbol)
@@ -58,7 +58,7 @@
                expand-environment)
        (let ((symbol-hash
                (%expand-environment-ref
-                 'syntax-symbol-hash 
+                 'syntax-symbol-hash
                  expand-environment)))
          (hash-table-ref symbol-hash symbol)))
 
@@ -76,7 +76,8 @@
                expand-environment))
            (cdr scm-code))))
 
-     (define (%list-expand-lambda scm-code global stack expand-environment)
+     (define (%list-expand-lambda scm-code global
+                                  stack expand-environment)
        (let* ((bodies
                 (map (lambda (expression)
                        (onif-expand
@@ -101,6 +102,14 @@
                      expand-environment))
             (cadr scm-code)
             body)))
+
+     (define (%list-expand-begin scm-code global stack expand-environment)
+       (cons (cadr (%expand-environment-syntax-symbol-hash-ref
+                        'begin
+                        expand-environment))
+             (map (lambda (x)
+                    (onif-expand x global stack expand-environment))
+                  (cdr scm-code))))
 
      (define (%list-expand operator scm-code global stack expand-environment)
         "operator is pair. example. (built-in-lambda . ONIF-SYMBOL)"
@@ -129,6 +138,12 @@
                         stack
                         expand-environment))
                      (cdr scm-code))))
+              ((built-in-begin)
+               (%list-expand-begin
+                 scm-code
+                 global
+                 stack
+                 expand-environment))
               (else ;FUNC RUN
                   (map
                     (lambda (expression)
@@ -150,7 +165,18 @@
            (else
              scm-code)))
 
+     (define (onif-expand/remove-outer-begin scm-code global)
+       (let remove-begin ((code scm-code))
+         (cond
+           ((not (pair? code))
+            (list code))
+           ((eq? 'built-in-begin
+                (car (%lookup-environment (car code) global '())))
+            (apply append
+                   (map remove-begin (cdr code))))
+           (else
+             (list code)))))
+
      (define (onif-expand-environment)
          `((syntax-symbol-hash
-             ,(onif-scm-env-tiny-core))))
-     ))
+             ,(onif-scm-env-tiny-core))))))
