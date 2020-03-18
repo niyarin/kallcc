@@ -1,5 +1,6 @@
 (include "./onif-symbol.scm")
 (include "./onif-scm-env.scm");
+(include "./onif-misc.scm");
 
 (define-library (onif expand)
    (cond-expand
@@ -8,6 +9,7 @@
                  (scheme write);DEBUG
                  (srfi 125)
                  (onif scm env)
+                 (onif misc)
                  (onif symbol)))
      ((library (scheme hash))
          (import (scheme base)
@@ -19,7 +21,8 @@
 
    (export onif-expand
            onif-expand-environment
-           onif-expand/remove-outer-begin)
+           onif-expand/remove-outer-begin
+           onif-expand/separate-namespaces)
 
    (begin
 
@@ -176,6 +179,20 @@
                    (map remove-begin (cdr code))))
            (else
              (list code)))))
+
+     (define (onif-expand/separate-namespaces expressions global)
+       (let-values (((namespaces this-expressions)
+                        (onif-misc/filter-&-elses
+                          (lambda (x)
+                            (and (pair? x)
+                                 (eq? 'built-in-define-library
+                                      (car (%lookup-environment
+                                             (car x)
+                                             global
+                                             '())))))
+                          expressions)))
+            (cons (list '() this-expressions)
+                  (map cdr namespaces))))
 
      (define (onif-expand-environment)
          `((syntax-symbol-hash
