@@ -11,9 +11,9 @@
            onif-misc/onif-symbol-hash-ref
            onif-misc/ref-operations
            onif-misc/filter-&-elses
-           onif-misc/tail-pair
-           onif-misc/tail-pair-res
-           onif-misc/tail-pair-push!)
+           onif-misc/ft-pair
+           onif-misc/ft-pair-res
+           onif-misc/ft-pair-push!)
    (begin
      (define (onif-misc/make-check-onif-symbol-base-function target-symbol)
        (lambda (operator onif-symbol-hash)
@@ -45,27 +45,27 @@
              => (lambda (x) x))
             (else #f))))
 
-     (define (onif-misc/tail-pair)
+     (define (onif-misc/ft-pair)
         (let ((head (cons #f '())))
           (cons head head)))
 
-     (define onif-misc/tail-pair-res cdar)
+     (define onif-misc/ft-pair-res cdar)
 
-     (define (onif-misc/tail-pair-push! tail-pair x)
-       (set-cdr! (cdr tail-pair) (list x))
-       (set-cdr! tail-pair (cddr tail-pair)))
+     (define (onif-misc/ft-pair-push! ft-pair x)
+       (set-cdr! (cdr ft-pair) (list x))
+       (set-cdr! ft-pair (cddr ft-pair)))
 
      (define (onif-misc/filter-&-elses fn ls)
-       (let ((res1 (onif-misc/tail-pair))
-             (elses (onif-misc/tail-pair)))
+       (let ((res1 (onif-misc/ft-pair))
+             (elses (onif-misc/ft-pair)))
           (let loop ((ls ls))
             (cond ((null? ls)
                    (values
-                       (onif-misc/tail-pair-res res1)
-                       (onif-misc/tail-pair-res elses)))
+                       (onif-misc/ft-pair-res res1)
+                       (onif-misc/ft-pair-res elses)))
                   ((fn (car ls))
-                   (onif-misc/tail-pair-push! res1 (car ls))
+                   (onif-misc/ft-pair-push! res1 (car ls))
                    (loop (cdr ls)))
                   (else
-                   (onif-misc/tail-pair-push! elses (car ls))
+                   (onif-misc/ft-pair-push! elses (car ls))
                    (loop (cdr ls)))))))))
