@@ -1,13 +1,17 @@
 (include "./onif-symbol.scm")
+(include "./onif-idebug.scm")
 
 (define-library (onif misc)
    (import (scheme base)
            (srfi 125)
+           (scheme write)
+           (onif idebug);
            (onif symbol))
    (export onif-misc/make-check-onif-symbol-base-function
            onif-misc/lambda-operator?
            onif-misc/begin-operator?
            onif-misc/lambda-meta-operator?
+           onif-misc/define-operator?
            onif-misc/onif-symbol-hash-ref
            onif-misc/ref-operations
            onif-misc/filter-&-elses
@@ -31,6 +35,9 @@
 
      (define onif-misc/begin-operator?
        (onif-misc/make-check-onif-symbol-base-function 'begin))
+
+     (define onif-misc/define-operator?
+       (onif-misc/make-check-onif-symbol-base-function 'define))
 
      (define (onif-misc/onif-symbol-hash-ref onif-symbol-hash symbol)
         (cond
