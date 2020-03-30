@@ -17,7 +17,8 @@
            onif-misc/filter-&-elses
            onif-misc/ft-pair
            onif-misc/ft-pair-res
-           onif-misc/ft-pair-push!)
+           onif-misc/ft-pair-push!
+           onif-misc/for-each-cell1)
    (begin
      (define (onif-misc/make-check-onif-symbol-base-function target-symbol)
        (lambda (operator onif-symbol-hash)
@@ -61,6 +62,12 @@
      (define (onif-misc/ft-pair-push! ft-pair x)
        (set-cdr! (cdr ft-pair) (list x))
        (set-cdr! ft-pair (cddr ft-pair)))
+
+     (define (onif-misc/for-each-cell1 fn ls)
+       (let loop ((cell ls))
+         (when (pair? cell)
+            (fn cell)
+            (loop (cdr cell)))))
 
      (define (onif-misc/filter-&-elses fn ls)
        (let ((res1 (onif-misc/ft-pair))

@@ -5,7 +5,6 @@
 
    (export onif-symbol onif-symbol? onif-symbol->symbol onif-symbol/onif-symbol?  onif-symbol/ref-symbol)
    (begin
-
      (define *id-counter* 0)
      (define-record-type <onif-symbol>
          (%onif-symbol base-symbol id)
@@ -32,5 +31,4 @@
         (string-append
           (symbol->string (%onif-symbol-ref-base-symbol osym))
           "-!"
-          (number->string (%onif-symbol-ref-id osym))))
-     ))
+          (number->string (%onif-symbol-ref-id osym))))))

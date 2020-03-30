@@ -1,18 +1,27 @@
 (include "./onif-symbol.scm")
 (include "./onif-scm-env.scm");
 (include "./onif-misc.scm");
+(include "./lib/thread-syntax.scm")
+(include "./onif-idebug.scm")
+
+;TODO:fix import expression
 
 (define-library (onif expand)
    (cond-expand
      ((library (srfi 125))
          (import (scheme base)
                  (scheme write);DEBUG
+                 (scheme cxr)
                  (srfi 125)
+                 (srfi 1)
+                 (niyarin thread-syntax)
+                 (onif idebug);
                  (onif scm env)
                  (onif misc)
                  (onif symbol)))
      ((library (scheme hash))
          (import (scheme base)
+                 (scheme list)
                  (scheme hash)
                  (onif scm env)
                  (onif symbol)))
@@ -22,7 +31,13 @@
    (export onif-expand
            onif-expand-environment
            onif-expand/remove-outer-begin
-           onif-expand/separate-namespaces)
+           onif-expand/separate-namespaces
+           onif-expand/import-expression?
+           onif-expand/export-expression?
+           onif-expand/make-environment
+           onif-expand/core-library-name? 
+           onif-expand/make-library-environment
+           onif-expand/defined-symbols)
 
    (begin
 
@@ -30,8 +45,7 @@
 
      (define (%rename-symbol sym))
 
-     (define (%global-lookup symbol global)
-         (if (hash-table-exists? global symbol)
+     (define (%global-lookup symbol global) (if (hash-table-exists? global symbol)
            (hash-table-ref global symbol)
            (list 'undefined symbol)))
 
@@ -106,6 +120,19 @@
             (cadr scm-code)
             body)))
 
+     (define (%list-expand-define-library
+               scm-code global stack expand-environment)
+         (let ((new-global (onif-scm-env-tiny-core))
+               (lib-name (cadr scm-code))
+               (begin-expression
+                 (cons 'begin
+                       (cddr scm-code))))
+           (%list-expand `(built-in-begin ,(onif-symbol 'BEGIN))
+                         begin-expression
+                         global
+                         '()
+                         expand-environment)))
+
      (define (%list-expand-begin scm-code global stack expand-environment)
        (cons (cadr (%expand-environment-syntax-symbol-hash-ref
                         'begin
@@ -113,6 +140,14 @@
              (map (lambda (x)
                     (onif-expand x global stack expand-environment))
                   (cdr scm-code))))
+
+     (define (%list-expand-define scm-code global stack expand-environment)
+       ;;TODO: Add support for defining function syntax sugar
+       `(,(cadr (%expand-environment-syntax-symbol-hash-ref
+                     'define
+                     expand-environment))
+         ,(cadr scm-code)
+         ,(onif-expand (caddr scm-code) global stack expand-environment)))
 
      (define (%list-expand operator scm-code global stack expand-environment)
         "operator is pair. example. (built-in-lambda . ONIF-SYMBOL)"
@@ -130,6 +165,12 @@
                  global
                  stack
                  expand-environment))
+              ((built-in-define)
+               (%list-expand-define
+                 scm-code
+                 global
+                 stack
+                 expand-environment))
               ((built-in-car built-in-cdr built-in-cons)
                (cons
                  (cadr operator)
@@ -141,6 +182,12 @@
                         stack
                         expand-environment))
                      (cdr scm-code))))
+              ((built-in-define-library)
+               (%list-expand-define-library
+                 scm-code
+                 global
+                 stack
+                 expand-environment))
               ((built-in-begin)
                (%list-expand-begin
                  scm-code
@@ -194,6 +241,56 @@
             (cons (list '() this-expressions)
                   (map cdr namespaces))))
 
+     (define (onif-expand/import-expression? expression global)
+         (and (pair? expression)
+              (let ((ope (%lookup-environment
+                           (car expression)
+                           global
+                           '())))
+                (and (pair? ope)
+                     (eq? 'built-in-import
+                          (car ope))))))
+
+      (define (onif-expand/export-expression? expression global)
+         (and (pair? expression)
+              (let ((ope (%lookup-environment
+                           (car expression)
+                           global
+                           '())))
+                (and (pair? ope)
+                     (eq? 'built-in-export
+                          (car ope))))))
+
      (define (onif-expand-environment)
          `((syntax-symbol-hash
-             ,(onif-scm-env-tiny-core))))))
+             ,(onif-scm-env-tiny-core))))
+
+     (define (onif-expand/make-library-environment)
+         `((syntax-symbol-hash
+             ,(onif-scm-env/make-env-for-library))))
+
+
+     (define (onif-expand/core-library-name? lib-name)
+       (equal? lib-name '(onif-lib core)))
+
+     (define (onif-expand/make-environment lib-names)
+       (fold
+         (lambda (lib-name env)
+           (cond
+             ((onif-expand/core-library-name? lib-name)
+              (hash-table-merge! env (onif-scm-env-tiny-core)))
+             (else
+               env)))
+         (make-hash-table eq?)
+         lib-names))
+
+     (define (onif-expand/defined-symbols expressions symbol-hash)
+       (->> expressions
+            (map (lambda (expression)
+                    (cond
+                      ((not (pair? expression)) #f)
+                      ((onif-misc/define-operator?
+                         (car expression) symbol-hash)
+                       (cadr expression))
+                      (else #f))))
+             (filter (lambda (x) x))))))

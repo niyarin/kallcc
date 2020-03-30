@@ -1,5 +1,4 @@
 (include "./onif-symbol.scm")
-(include "./onif-utils.scm")
 (include "./lib/thread-syntax.scm")
 
 (define-library (onif alpha conv)
@@ -8,9 +7,9 @@
            (srfi 125) ;SCHEME HASH
            (srfi 127)
            (onif misc)
-           (only (niyarin thread-syntax) ->>)
-           (onif utils))
-   (export onif-alpha/conv!)
+           (only (niyarin thread-syntax) ->>))
+   (export onif-alpha/conv!
+           onif-alpha/simple-conv!)
    (begin
       (define (%onif-symbol sym onif-symbol-hash)
         (cond
@@ -39,6 +38,22 @@
           => (lambda (x)
                (lseq-car (lseq-cdr x))))
          (else symbol)))
+
+     (define (onif-alpha/simple-conv! code comv-table)
+       (let loop ((code code))
+         (cond
+           ((and (symbol? code)
+                 (assq code comv-table))
+            => cadr)
+           ((not (pair? code)) code)
+           (else
+             (begin
+                (->> code
+                     (onif-misc/for-each-cell1
+                       (lambda (cell)
+                         (set-car! cell
+                                   (loop (car cell))))))
+                code)))))
 
      (define (onif-alpha/conv! code onif-symbol-hash
                                . optional-inital-stack)
@@ -79,7 +94,7 @@
                             (cddr code)))
                        code)))
                  (else
-                   (onif-utils-for-each-cell1
+                   (onif-misc/for-each-cell1
                      (lambda (cell)
                         (set-car!
                            cell
