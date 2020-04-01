@@ -1,5 +1,4 @@
 (include "./onif-misc.scm")
-(include "./onif-idebug.scm")
 (include "./lib/thread-syntax.scm")
 
 (define-library (onif flat-lambda)
@@ -49,8 +48,7 @@
                                expand-environment))
                    (prev-contain-symbols
                      (cond
-                       ((assq 'contain-symbols prev-info)
-                        => cadr)
+                       ((assq 'contain-symbols prev-info) => cadr)
                        (else '())))
                    (contain-symbols
                      (%list-set-difference2
