@@ -56,7 +56,7 @@
 
      (define (onif-idebug/debug-display icode . opt)
        (display
-         (onif-idebug-icode->code (cons icode opt))))
+         (apply onif-idebug-icode->code (cons icode opt))))
 
      (define (%icode->code/expression-conv icode opt)
        (let ((operator
