@@ -3,6 +3,9 @@
 (include "./lib/thread-syntax.scm")
 (include "./onif-idebug.scm")
 (include "./onif-scm-env.scm")
+(include "./onif-cps.scm")
+(include "./onif-meta-lambda.scm")
+(include "./onif-flat-lambda.scm")
 
 (define-library (onif phases)
    (import (scheme base)
@@ -11,17 +14,25 @@
            (scheme write);
            (onif idebug)
            (srfi 1)
-           (only (niyarin thread-syntax) ->>)
+           (srfi 69);
+           (only (niyarin thread-syntax) ->> ->)
            (onif symbol)
            (onif scm env)
+           (onif meta-lambda)
+           (onif name-ids)
            (onif alpha conv)
-           (onif expand))
+           (onif flat-lambda)
+           (onif expand)
+           (onif cps))
    (export onif-phases/pre-expand
            onif-phases/expand-namespaces
            onif-phases/solve-imported-name
            onif-phases/solve-imported-symbol
            onif-phases/alpha-conv!
-           onif-phases/first-stage)
+           onif-phases/first-stage
+           onif-phase/meta-lambda
+           onif-phase/make-name-local-ids
+           onif-phases/cps-conv)
    (begin
      (define (onif-phases/pre-expand code global)
        (let* ((expression-begin-removed
@@ -50,6 +61,7 @@
                 (let* ((new-global (onif-expand/make-environment (cdar expressions)))
                        (new-expand-environment
                          (list (list 'syntax-symbol-hash new-global)
+                               (list 'original-syntax-symbol-hash (onif-scm-env-tiny-core))
                                (list 'import-libraries
                                      (filter (lambda (libname) (not (onif-expand/core-library-name? libname)))
                                              (cdar expressions))))))
@@ -161,4 +173,49 @@
                          namespaces
                          (onif-phases/solve-imported-symbol namespaces))
                     namespaces)))
-            imported-rename))))
+            imported-rename))
+
+      (define (onif-phases/cps-conv namespaces)
+         (->> namespaces
+              (map (lambda (namespace)
+                     (->> (%namespace-assq 'body namespace)
+                          (map (lambda (expression)
+                                  (onif-cps-conv
+                                    expression
+                                    (%namespace-assq
+                                      ;'original-syntax-symbol-hash
+                                      'syntax-symbol-hash
+                                      namespace))))
+                         ((lambda (expression)
+                            (list (car namespace)
+                                  (cons (list 'body expression)
+                                     (cadr namespace))))))))))
+
+      (define (onif-phase/meta-lambda namespaces)
+        (->> namespaces
+             (map (lambda (namespace)
+                    (->> (%namespace-assq 'body namespace)
+                         (map (lambda (expression)
+                                  (onif-meta-lambda-conv
+                                      expression
+                                      (%namespace-assq
+                                        'syntax-symbol-hash
+                                        namespace)
+                                      (cadr namespace))))
+                         ((lambda (expression)
+                             (list (car namespace)
+                                   (cons (list 'body expression)
+                                         (cadr namespace))))))))))
+
+      (define (onif-phase/make-name-local-ids namespaces)
+        (->> namespaces
+             (map (lambda (namespace)
+                    (->> (%namespace-assq 'body namespace)
+                         (map (lambda (expression)
+                                 (name-ids/make-name-local-ids
+                                    expression
+                                    (%namespace-assq 'syntax-symbol-hash namespace))))
+                         ((lambda (expression)
+                            (list (car namespace)
+                                  (cons (list 'body expression)
+                                        (cadr namespace)))))))))))
