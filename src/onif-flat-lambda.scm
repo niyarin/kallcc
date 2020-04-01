@@ -1,5 +1,6 @@
 (include "./onif-misc.scm")
 (include "./onif-idebug.scm")
+(include "./lib/thread-syntax.scm")
 
 (define-library (onif flat-lambda)
    (import (scheme base)
@@ -8,6 +9,7 @@
            (only (scheme list) filter)
            (srfi 125);scheme hash
            (onif meta-lambda)
+           (only (niyarin thread-syntax) ->> ->)
            (onif misc)
            (onif symbol))
    (export onif-flat-flat-code&id-lambdas)
@@ -73,16 +75,14 @@
                     id
                     contain-symbols))))
          (else
-           (map
-             (lambda (x)
-               (%flat-conv
-                 x
-                 lambdas-box
-                 prev-info
-                 offset-box
-                 symbol-hash
-                 expand-environment))
-             code))))
+           (->> code
+               (map (lambda (x)
+                        (%flat-conv x
+                                    lambdas-box
+                                    prev-info
+                                    offset-box
+                                    symbol-hash
+                                    expand-environment)))))))
 
      (define (onif-flat-flat-code&id-lambdas
                code
