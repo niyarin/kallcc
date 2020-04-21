@@ -6,6 +6,9 @@
 (include "./onif-cps.scm")
 (include "./onif-meta-lambda.scm")
 (include "./onif-flat-lambda.scm")
+(include "./onif-name-ids.scm")
+(include "./onif-alpha-conv.scm")
+(include "./onif-like-asm.scm")
 
 (define-library (onif phases)
    (import (scheme base)
@@ -22,6 +25,7 @@
            (onif name-ids)
            (onif alpha conv)
            (onif flat-lambda)
+           (onif like-asm)
            (onif expand)
            (onif cps))
    (export onif-phases/pre-expand
@@ -33,7 +37,8 @@
            onif-phase/meta-lambda
            onif-phase/make-name-local-ids
            onif-phase/flat-lambda
-           onif-phases/cps-conv)
+           onif-phases/cps-conv
+           onif-phase/asm)
    (begin
      (define (onif-phases/pre-expand code global)
        (let* ((expression-begin-removed
@@ -223,34 +228,34 @@
 
       (define (onif-phase/flat-lambda namespaces)
         (let ((res (onif-misc/ft-pair)))
-          (->> namespaces
-               (fold
-                 (lambda  (namespace id-lambdas)
-                   (->> (%namespace-assq 'body  namespace)
-                        (fold (lambda (expression expression-offset)
-                                (let-values (((flat-code _id-lambdas)
-                                              (onif-flat-flat-code&id-lambdas
-                                                expression
-                                                (->> (map cadr expression-offset)
-                                                     (apply append)
-                                                     length)
-                                                (%namespace-assq
-                                                  'syntax-symbol-hash
-                                                  namespace)
-                                                (cadr namespace))))
-                                            (cons (list flat-code _id-lambdas)
-                                                  expression-offset)))
-                              '())
-                        ((lambda (expression-offsets)
-                           (onif-misc/ft-pair-push!
-                             res
-                             `(,(car namespace)
-                                ((body ,(apply append (map car expression-offsets)))
-                                 (id-lambdas ,(apply append (map cadr expression-offsets)))
-                                 .
-                                 ,(cadr namespace))))
-                           (apply append
-                                  (append (map cadr expression-offsets)
-                                          id-lambdas))))))
-                 '()))
+          (fold (lambda  (namespace offset)
+                   (let ((symbol-hash
+                           (%namespace-assq 'syntax-symbol-hash namespace)))
+                      (->> (%namespace-assq 'body  namespace)
+                           (fold (lambda (expression expression-offset)
+                                   (let-values (((flat-code _id-lambdas)
+                                                 (onif-flat-flat-code&id-lambdas
+                                                   expression
+                                                   (->> (map cadr expression-offset)
+                                                        (apply append)
+                                                        length
+                                                        (+ offset))
+                                                   symbol-hash
+                                                   (cadr namespace))))
+                                      (cons (list flat-code _id-lambdas)
+                                            expression-offset)))
+                                 '())
+                           ;Current data format is ((flat code id-lambdas) ...)
+                           ((lambda (expression-offsets)
+                              (let ((lambdas (apply append (map cadr expression-offsets))))
+                                 (onif-misc/ft-pair-push!
+                                   res
+                                   `(,(car namespace)
+                                      ((body ,(apply append (map car expression-offsets)))
+                                       (id-lambdas ,lambdas)
+                                       .
+                                       ,(cadr namespace))))
+
+                                 (+ (length lambdas) offset)))))))
+             0 namespaces)
           (onif-misc/ft-pair-res res)))))
