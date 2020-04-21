@@ -32,9 +32,9 @@
                         (%icode->code x opt))
                       (cadr icode))
                   ,@(append
-                     '({)
+                     '(|{|)
                      (reverse res)
-                      '(}))
+                      '(|}|))
                   .
                   ,(map
                      (lambda (x)
