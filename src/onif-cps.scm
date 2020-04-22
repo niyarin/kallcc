@@ -97,18 +97,16 @@ This phase rules.
                    ((and (null? code) beg-flag (last-pair scm-code))
                       (%begin-last-expression scm-code stack onif-symbol-hash))
                    ((null? code)
-                    (cons
-                      (car scm-code)
-                      (cons
-                        (if (cadar stack)
-                          `(,(onif-misc/onif-symbol-hash-ref onif-symbol-hash 'lambda)
-                             (,(caar stack))
-                              ,(%cps-conv (cadar stack) (cdr stack) onif-symbol-hash))
-                           (caar stack))
-                        (cdr scm-code))))
-                   ((%onif-not-have-continuation?
-                      (car code)
-                      onif-symbol-hash)
+                    (cons (cadr res-top-cell)
+                          (cons (if (cadar stack)
+                                  `(,(onif-misc/onif-symbol-hash-ref
+                                       onif-symbol-hash 'lambda)
+                                    (,(caar stack))
+                                    ,(%cps-conv (cadar stack)
+                                                (cdr stack) onif-symbol-hash))
+                                  (caar stack))
+                              (cddr res-top-cell))))
+                   ((%onif-not-have-continuation? (car code) onif-symbol-hash)
                     => (lambda (cont-val)
                           (set-cdr! res-cell (cons (car cont-val) '()))
                           (set! res-cell (cdr res-cell))
