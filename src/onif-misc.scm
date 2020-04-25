@@ -12,6 +12,7 @@
            onif-misc/begin-operator?
            onif-misc/lambda-meta-operator?
            onif-misc/define-operator?
+           onif-misc/if-operator?
            onif-misc/onif-symbol-hash-ref
            onif-misc/ref-operations
            onif-misc/filter-&-elses
@@ -40,6 +41,9 @@
 
      (define onif-misc/define-operator?
        (onif-misc/make-check-onif-symbol-base-function 'define))
+
+     (define onif-misc/if-operator?
+       (onif-misc/make-check-onif-symbol-base-function 'if))
 
      (define (onif-misc/onif-symbol-hash-ref onif-symbol-hash symbol)
         (cond
