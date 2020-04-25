@@ -168,9 +168,9 @@
                                           (cadr namespace))))))))
                (imported-rename
                  (begin
-                    (map (lambda (expressions rename-alist)
-                           (->> (cadr expressions)
-                                (assv 'body )
+                    (map (lambda (namespace rename-alist)
+                           (->> (cadr namespace)
+                                (assq 'body)
                                 cadr
                                 (for-each (lambda (expression)
                                               (onif-alpha/simple-conv!
@@ -251,11 +251,40 @@
                                  (onif-misc/ft-pair-push!
                                    res
                                    `(,(car namespace)
-                                      ((body ,(apply append (map car expression-offsets)))
+                                      ((body ,(map car expression-offsets))
                                        (id-lambdas ,lambdas)
                                        .
                                        ,(cadr namespace))))
 
                                  (+ (length lambdas) offset)))))))
              0 namespaces)
-          (onif-misc/ft-pair-res res)))))
+          (onif-misc/ft-pair-res res)))
+
+      (define (%asm-funs namespaces global-ids-box)
+        (->> namespaces
+             (map (lambda (namespace)
+                    (->> (%namespace-assq 'id-lambdas namespace)
+                         ((lambda (id-lambdas)
+                            (onif-like-asm/convert-functions
+                              id-lambdas
+                              0
+                              global-ids-box
+                              (%namespace-assq 'syntax-symbol-hash namespace)))))))))
+
+      (define (%asm-body namespaces global-ids-box)
+        (->> namespaces
+              (map (lambda (namespace)
+                     (->> (%namespace-assq 'body namespace)
+                          (map (lambda (body)
+          (display "BODEY>>")(onif-idebug/debug-display body)(newline)
+                                 (onif-like-asm/convert
+                                    body
+                                    0
+                                    '()
+                                    global-ids-box
+                                    (%namespace-assq 'syntax-symbol-hash namespace)
+                                    0))))))))
+      (define (onif-phase/asm namespaces)
+        (let ((global-ids-box (onif-like-asm/make-global-ids-box)))
+           (%asm-body namespaces global-ids-box)
+           (%asm-funs namespaces global-ids-box)))))

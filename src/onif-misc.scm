@@ -18,7 +18,8 @@
            onif-misc/ft-pair
            onif-misc/ft-pair-res
            onif-misc/ft-pair-push!
-           onif-misc/for-each-cell1)
+           onif-misc/for-each-cell1
+           onif-misc/map-indexed)
    (begin
      (define (onif-misc/make-check-onif-symbol-base-function target-symbol)
        (lambda (operator onif-symbol-hash)
@@ -82,4 +83,14 @@
                    (loop (cdr ls)))
                   (else
                    (onif-misc/ft-pair-push! elses (car ls))
-                   (loop (cdr ls)))))))))
+                   (loop (cdr ls)))))))
+
+    (define (onif-misc/map-indexed f ls)
+      (let ((res-cell (onif-misc/ft-pair)))
+        (let loop ((ls ls)
+                   (index 0))
+          (if (null? ls)
+            (onif-misc/ft-pair-res res-cell)
+            (begin
+              (onif-misc/ft-pair-push! res-cell (f index ls))
+              (loop (cdr ls) (+ index 1)))))))))
