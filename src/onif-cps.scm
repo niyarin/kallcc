@@ -47,7 +47,7 @@ This phase rules.
                (list expression))
            ((null? expression);NULL
                (list '()))
-           ((eq? (car expression) 'quote);QUOTE
+           ((onif-misc/quote-operator? (car expression) onif-symbol-hash)
             (list expression))
            ((%lambda-operator? (car expression) onif-symbol-hash);LAMBDA
             (let ((cps-symbol (onif-symbol)))
@@ -125,23 +125,21 @@ This phase rules.
          (let ((test-const-exp
                  (%onif-not-have-continuation? (cadr scm-code) onif-symbol-hash)))
            (if test-const-exp
-             (list
-                   (car scm-code)
+             (list (car scm-code)
                    (car test-const-exp)
                    (%cps-conv (list-ref scm-code 2) stack onif-symbol-hash)
                    (%cps-conv (list-ref scm-code 3) stack onif-symbol-hash))
-             (%cps-conv
-               (let ((new-sym (onif-symbol)))
+             (let ((new-sym (onif-symbol)))
                  (%cps-conv
                   (cadr scm-code)
                   (cons
                     (list new-sym
-                          (list (car code)
+                          (list (car scm-code)
                                 new-sym
-                                (list-ref code 2)
-                                (list-ref code 3)))
+                                (list-ref scm-code 2)
+                                (list-ref scm-code 3)))
                     stack)
-                  onif-symbol-hash))))))
+                  onif-symbol-hash)))))
 
       (define (%cps-conv scm-code stack onif-symbol-hash)
         (let ((const-val (%onif-not-have-continuation?

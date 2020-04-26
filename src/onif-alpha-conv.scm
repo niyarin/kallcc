@@ -72,6 +72,7 @@
                   (%symbol-conv code stk))
                  ((not (list? code)) code)
                  ((null? code) '())
+                 ((onif-misc/quote-operator? (car code) onif-symbol-hash) code)
                  ((%lambda-operator? (car code) onif-symbol-hash)
                   (let* ((formals (cadr code))
                          (stack-cell

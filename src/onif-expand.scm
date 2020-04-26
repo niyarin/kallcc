@@ -35,7 +35,7 @@
            onif-expand/import-expression?
            onif-expand/export-expression?
            onif-expand/make-environment
-           onif-expand/core-library-name? 
+           onif-expand/core-library-name?
            onif-expand/make-library-environment
            onif-expand/defined-symbols)
 
@@ -171,7 +171,12 @@
                  global
                  stack
                  expand-environment))
-              ((built-in-car built-in-cdr built-in-cons)
+              ((built-in-quote)
+                  (list (cadr (%expand-environment-syntax-symbol-hash-ref
+                              'quote
+                              expand-environment))
+                        (cadr scm-code)))
+              ((built-in-car built-in-cdr built-in-cons built-in-null?)
                (cons
                  (cadr operator)
                  (map
