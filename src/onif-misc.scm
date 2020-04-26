@@ -96,5 +96,5 @@
           (if (null? ls)
             (onif-misc/ft-pair-res res-cell)
             (begin
-              (onif-misc/ft-pair-push! res-cell (f index ls))
+              (onif-misc/ft-pair-push! res-cell (f index (car ls)))
               (loop (cdr ls) (+ index 1)))))))))
