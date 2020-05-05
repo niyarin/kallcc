@@ -1,8 +1,8 @@
 (include "./onif-symbol.scm")
 
 (define-library (onif idebug)
-   (import (scheme base) (onif symbol) (scheme cxr) (scheme write))
-   (export onif-idebug-icode->code onif-idebug/debug-display)
+   (import (scheme base) (onif symbol) (scheme cxr) (scheme write) (scheme list))
+   (export onif-idebug-icode->code onif-idebug/debug-display onif-idebug/asm-vis )
    (begin
      (define (%opt-ref opt key)
       (cond
@@ -19,8 +19,9 @@
         (cond
           (not-contain-meta-info
            (%icode->code/expression-conv
-                 (cons 'lambda
-                   (cons (cadr icode) (cdddr icode)))
+                 (cons* 'lambda
+                        (cadr icode)
+                        (cdddr icode))
                  opt))
           (shaping-meta-info
             (let loop ((infos (caddr icode))
@@ -44,13 +45,11 @@
                       (val (cadar infos)))
                   (loop
                     (cdr infos)
-                    (cons
+                    (cons*
                       ","
-                      (cons
-                         (%icode->code val opt)
-                         (cons
-                            (string-append (symbol->string key) ":")
-                            res))))))))
+                      (%icode->code val opt)
+                      (string-append (symbol->string key) ":")
+                      res))))))
           (else
            (map (lambda (x) (%icode->code x opt)) icode)))))
 

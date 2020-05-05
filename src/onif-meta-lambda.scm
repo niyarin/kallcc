@@ -35,8 +35,7 @@
                  (cond ((assq 'contain-symbols options) => cadr )(else '()))))
             (list
               (list 'bind-names
-                    (append (apply append stack)
-                            formals))
+                    (append (concatenate stack) formals))
               (list 'contain-symbols contain-symbols))))
 
      (define (onif-meta-lambda/update-meta-info meta-lambda-code key val)

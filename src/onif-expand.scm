@@ -223,12 +223,11 @@
      (define (onif-expand/remove-outer-begin scm-code global)
        (let remove-begin ((code scm-code))
          (cond
-           ((not (pair? code))
+           ((not-pair? code)
             (list code))
            ((eq? 'built-in-begin
                 (car (%lookup-environment (car code) global '())))
-            (apply append
-                   (map remove-begin (cdr code))))
+            (apply-map remove-begin (cdr code)))
            (else
              (list code)))))
 
@@ -293,7 +292,7 @@
        (->> expressions
             (map (lambda (expression)
                     (cond
-                      ((not (pair? expression)) #f)
+                      ((not-pair? expression) #f)
                       ((onif-misc/define-operator?
                          (car expression) symbol-hash)
                        (cadr expression))

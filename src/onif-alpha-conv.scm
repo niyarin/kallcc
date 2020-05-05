@@ -4,6 +4,7 @@
 (define-library (onif alpha conv)
    (import (scheme base)
            (onif symbol)
+           (scheme list)
            (srfi 125) ;SCHEME HASH
            (srfi 127)
            (onif misc)
@@ -45,7 +46,7 @@
            ((and (symbol? code)
                  (assq code comv-table))
             => cadr)
-           ((not (pair? code)) code)
+           ((not-pair? code) code)
            (else
              (begin
                 (->> code
