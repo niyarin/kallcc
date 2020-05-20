@@ -13,6 +13,7 @@
            onif-misc/lambda-meta-operator?
            onif-misc/define-operator?
            onif-misc/if-operator?
+           onif-misc/quote-operator?
            onif-misc/onif-symbol-hash-ref
            onif-misc/ref-operations
            onif-misc/filter-&-elses
@@ -45,6 +46,9 @@
      (define onif-misc/if-operator?
        (onif-misc/make-check-onif-symbol-base-function 'if))
 
+     (define onif-misc/quote-operator?
+       (onif-misc/make-check-onif-symbol-base-function 'quote))
+
      (define (onif-misc/onif-symbol-hash-ref onif-symbol-hash symbol)
         (cond
           ((hash-table-ref onif-symbol-hash symbol) => cadr)
@@ -54,7 +58,7 @@
        (if (not (onif-symbol? operator))
          #f
          (case (onif-symbol/ref-symbol operator)
-            ((CONS CAR CDR PAIR?)
+            ((CONS CAR CDR PAIR? SET-CAR! SET-CDR!)
              => (lambda (x) x))
             (else #f))))
 

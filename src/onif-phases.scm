@@ -260,7 +260,7 @@
              0 namespaces)
           (onif-misc/ft-pair-res res)))
 
-      (define (%asm-funs namespaces global-ids-box)
+      (define (%asm-funs namespaces global-ids-box jump-box)
         (->> namespaces
              (map (lambda (namespace)
                     (->> (%namespace-assq 'id-lambdas namespace)
@@ -269,22 +269,33 @@
                               id-lambdas
                               0
                               global-ids-box
-                              (%namespace-assq 'syntax-symbol-hash namespace)))))))))
+                              (%namespace-assq 'syntax-symbol-hash namespace)
+                              jump-box))))))))
 
-      (define (%asm-body namespaces global-ids-box)
+      (define (%asm-body namespaces global-ids-box jump-box)
         (->> namespaces
               (map (lambda (namespace)
-                     (->> (%namespace-assq 'body namespace)
+                     (->> (reverse (%namespace-assq 'body namespace))
                           (map (lambda (body)
-          (display "BODEY>>")(onif-idebug/debug-display body)(newline)
-                                 (onif-like-asm/convert
-                                    body
-                                    0
-                                    '()
-                                    global-ids-box
-                                    (%namespace-assq 'syntax-symbol-hash namespace)
-                                    0))))))))
+                                 (cons
+                                   '(BODY-START)
+                                   (onif-like-asm/convert
+                                       body
+                                       0
+                                       '()
+                                       global-ids-box
+                                       (%namespace-assq 'syntax-symbol-hash namespace)
+                                       0
+                                       jump-box))))
+                          (apply append))))))
+
       (define (onif-phase/asm namespaces)
-        (let ((global-ids-box (onif-like-asm/make-global-ids-box)))
-           (%asm-body namespaces global-ids-box)
-           (%asm-funs namespaces global-ids-box)))))
+        (let* ((global-ids-box (onif-like-asm/make-global-ids-box))
+               (jump-box (list 0))
+               (bodies (%asm-body namespaces global-ids-box jump-box))
+               (funs (%asm-funs namespaces global-ids-box jump-box)))
+            (append
+              (concatenate  funs)
+              '((COMMENT "BODY"))
+              (apply append bodies)
+              '((BODY-START) (HALT)))))))

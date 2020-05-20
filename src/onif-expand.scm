@@ -227,7 +227,7 @@
             (list code))
            ((eq? 'built-in-begin
                 (car (%lookup-environment (car code) global '())))
-            (apply-map remove-begin (cdr code)))
+            (append-map remove-begin (cdr code)))
            (else
              (list code)))))
 
