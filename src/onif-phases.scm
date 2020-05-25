@@ -284,8 +284,9 @@
                                        0
                                        '()
                                        global-ids-box
-                                       (%namespace-assq 'syntax-symbol-hash namespace)
-                                       0
+                                       (%namespace-assq 'syntax-symbol-hash
+                                                        namespace)
+                                       1
                                        jump-box))))
                           (apply append))))))
 

@@ -70,8 +70,7 @@
                                        (eq? (car var-position) 'GLOBAL)))
                              var-info)
                             ((assq (cadr var-position) (car global-ids-box))
-                             => (lambda (id)
-                                  `(SET! ,(cadr var-info) (G id))))
+                             => (lambda (id) `(SET! ,(cadr var-info) (G ,id))))
                             ((cadr global-ids-box)
                              =>
                              (lambda (id)
@@ -103,52 +102,60 @@
                 ((%lfun? (caar code) onif-symbol-hash);LOAD-FUN
                  (onif-idebug/debug-display (car code))(newline)
                  (let* ((make-env-vector `(VECTOR ,(length (caddar code))
-                                                  (R ,offset)))
+                                                  (R ,(+ offset 1))))
                         (local-ids (%meta-info-ref last-meta-info 'local-ids))
                         (registers
-                          (map
-                            (lambda (x)
-                              (+ offset 1 (cadr (assq  x local-ids))))
-                            (caddar code)))
+                          (map (lambda (x) (+ offset 1 (cadr (assq  x local-ids))))
+                               (caddar code)))
                         (set-env-vectors
                           (onif-misc/map-indexed
                             (lambda (index x)
-                              `(VECTOR-SET! (R ,offset) ,index (R ,x)))
+                              `(VECTOR-SET! (R ,(+ offset 1)) ,index (R ,x)))
                             registers))
-                        (make-closure-addr `((SET! (R ,(+ offset 1)) ,(cadar code))))
+                        (make-closure-addr
+                          `((SET! (R ,(+ offset 2))
+                                  (M ,(string->symbol
+                                        (string-append
+                                        "FUN"
+                                        (number->string (cadar code))))))))
                         (make-closure
                           `(MAKE-CLOSURE
-                             (R ,offset)
                              (R ,(+ offset 1))
+                             (R ,(+ offset 2))
                              (R ,offset))))
                      (loop
                        (cdr code)
                        (+ offset 1)
                        (append
                          (list make-closure)
+                         make-closure-addr
                          set-env-vectors
                          (list make-env-vector)
-                         make-closure-addr
                          (list `(COMMENT "Env vector (for closure)" ,(onif-idebug-icode->code (caddar code))))
                          rev-res))))
                 (else (error "TBA 2" (onif-idebug-icode->code code))))))
 
-     (define (%operation-conv operator register-offset)
+     (define (%operation-conv operator register-offset copy-offset)
        (case operator
-         ((PAIR? CAR CDR)
+         ((PAIR? CAR CDR);FIX
           `((,operator (R ,(+ register-offset 1)) (R ,(+ register-offset 1)))))
-         ((SET-CAR! SET-CDR!)
+         ((SET-CAR! SET-CDR!);FIX
           `((COMMENT "SET-CAR/SET-CDR!")
             (,operator (R ,(+ register-offset 1)) (R ,(+ register-offset 1)))
             (SET! (R ,register-offset) (R ,(+ register-offset 1)));;TODO:check this code.(I think that this is unnecesarry.)
             (CALL 1)))
-         ((CONS)
+         ((CONS);FIX
           `((,operator (R ,(+ register-offset 1))
                        (R ,(+ register-offset 2))
                        (R ,(+ register-offset 1)))
             (CALL 1)))
-         (else
-           (error "Undefined operator!" operator))))
+         ((FX+ FX- FX=?)
+            `((SET! (R ,(+ register-offset 1)) (R ,copy-offset))
+              (,operator (R ,(+ register-offset 1))
+                         (R ,(+ copy-offset 2))
+                         (R ,(+ register-offset 1)))
+            (CALL 1)))
+         (else (error "Undefined operator!" operator))))
 
      (define (%global-ref! name global-ids-box)
        (cond
@@ -186,11 +193,10 @@
                           onif-symbol-hash
                           local-register-offset))
                        (operation-code
-                         (%operation-conv operator register-offset)))
+                         (%operation-conv operator register-offset (- local-register-offset 1))))
                   (append arg-code operation-code))))
          ((onif-misc/define-operator? (car code) onif-symbol-hash)
-          (let ((global
-                  (%global-ref! (cadr code) global-ids-box))
+          (let ((global (%global-ref! (cadr code) global-ids-box))
                 (asm-body
                   (%expand-arg
                     (list (cadr code)
@@ -235,8 +241,7 @@
                         false
                         `((ELSE ,jsymbol))
                         true
-                        `((ENDIF ,jsymbol))
-                        )))
+                        `((ENDIF ,jsymbol)))))
 
          (else
            (let ((arg-code (%expand-arg
@@ -279,7 +284,7 @@
                                       (+ (cadr binding) offset)))
                               local-ids))
                   (body (cadddr meta-function))
-                  (copy-local-offset (length body))
+                  (copy-local-offset (+ (length body) 1))
                   (<remove-after>/copy-local
                      (map (lambda (key-val)
                                  `(SET! (R ,(+ (if (list? body)
@@ -289,7 +294,10 @@
                                         (R ,(+ (cadr key-val) 1))))
                                local-ids))
                   (_res (append res
-                                (list `(DEFUN ,f-id)
+                                (list `(DEFUN
+                                        ,(string->symbol
+                                           (string-append "FUN"
+                                        (number->string f-id))))
                                       `(COMMENT "FUN" ,(onif-idebug-icode->code local-ids)
                                                       ,(onif-idebug-icode->code bindings)))
                                 (cons '(COMMENT "Copy local")
