@@ -5,8 +5,9 @@
    (import (scheme base)
            (scheme cxr)
            (onif idebug)
-           (only (scheme list) filter)
+           (only (scheme list) filter remove not-pair?)
            (srfi 125);scheme hash
+           (scheme write);;;
            (onif meta-lambda)
            (only (niyarin thread-syntax) ->> ->)
            (onif misc)
@@ -23,9 +24,8 @@
        (onif-misc/make-check-onif-symbol-base-function 'if))
 
      (define (%list-set-difference2 ls1 ls2)
-       (filter
-         (lambda (x) (not (member x ls2)))
-         ls1))
+       ;;第二引数にないものだけを第一引数からとる
+       (remove (lambda (x) (member x ls2)) ls1))
 
      (define (%flat-conv
                code
@@ -35,7 +35,7 @@
                symbol-hash
                expand-environment)
        (cond
-         ((not (pair? code)) code)
+         ((not-pair? code) code)
          ((%lambda-meta-operator? (car code) symbol-hash);<= ONLY body is 1.
             (let* ((id (car offset-box))
                    (_ (set-car!  offset-box (+ id 1)))
@@ -47,10 +47,13 @@
                                symbol-hash
                                expand-environment))
                    (prev-contain-symbols
+                     ;;1つ外側の保持すべき変数
                      (cond
                        ((assq 'contain-symbols prev-info) => cadr)
                        (else '())))
                    (contain-symbols
+                     ;;このクロージャーが保持しなければならない値
+                     ;;外にしかない必要変数セット - 現在の必要変数セット - 引数
                      (%list-set-difference2
                         (%list-set-difference2
                            prev-contain-symbols
@@ -59,7 +62,7 @@
                    (new-lambda
                      (onif-meta-lambda/update-meta-info-body
                        code
-                       'closure-env-symbols
+                       'current-closure-vars
                        contain-symbols
                        new-body)))
                (begin

@@ -21,8 +21,18 @@
            onif-misc/ft-pair-res
            onif-misc/ft-pair-push!
            onif-misc/for-each-cell1
-           onif-misc/map-indexed)
+           onif-misc/map-indexed
+           onif-misc/var?
+           onif-misc/const?)
    (begin
+     (define (onif-misc/var? obj)
+       (or (symbol? obj)
+           (onif-symbol/onif-symbol? obj)))
+
+     (define (onif-misc/const? obj)
+       (and (not (pair? obj))
+            (not (onif-misc/var? obj))))
+
      (define (onif-misc/make-check-onif-symbol-base-function target-symbol)
        (lambda (operator onif-symbol-hash)
           (cond
@@ -58,7 +68,7 @@
        (if (not (onif-symbol? operator))
          #f
          (case (onif-symbol/ref-symbol operator)
-            ((CONS CAR CDR PAIR? SET-CAR! SET-CDR! FX+ FX- FX=)
+            ((CONS CAR CDR PAIR? SET-CAR! SET-CDR! FX+ FX- FX= FX<?)
              => (lambda (x) x))
             (else #f))))
 

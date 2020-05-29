@@ -70,14 +70,16 @@
                                        (eq? (car var-position) 'GLOBAL)))
                              var-info)
                             ((assq (cadr var-position) (car global-ids-box))
-                             => (lambda (id) `(SET! ,(cadr var-info) (G ,id))))
+                             => (lambda (id-apair)
+                                  `(SET! ,(cadr var-info)
+                                         (G ,(cadr id-apair)))))
                             ((cadr global-ids-box)
                              =>
                              (lambda (id)
                                  (set-car!
                                    global-ids-box
                                    (cons
-                                     (list (cadr var-position) (+ id 1))
+                                     (list (cadr var-position) id)
                                      (car global-ids-box)))
                                  (set-cdr!
                                    global-ids-box
@@ -95,17 +97,17 @@
                    (+ offset 1)
                    (cons (%atom-conv offset (car code)) rev-res)))
                 ((onif-misc/quote-operator? (caar code) onif-symbol-hash)
-                 (loop
-                   (cdr code)
-                   (+ offset 1)
-                   (cons `(SET! (R ,offset) ,(cadar code)) rev-res)))
-                ((%lfun? (caar code) onif-symbol-hash);LOAD-FUN
-                 (onif-idebug/debug-display (car code))(newline)
-                 (let* ((make-env-vector `(VECTOR ,(length (caddar code))
+                 (loop (cdr code)
+                       (+ offset 1)
+                       (cons `(SET! (R ,offset) ,(cadar code)) rev-res)))
+                ((%lfun? (caar code) onif-symbol-hash)
+                 ;;(LFUN function-id list-of-free-var)
+                 (let* ((make-var `(VECTOR ,(length (caddar code))
                                                   (R ,(+ offset 1))))
                         (local-ids (%meta-info-ref last-meta-info 'local-ids))
                         (registers
-                          (map (lambda (x) (+ offset 1 (cadr (assq  x local-ids))))
+                          (map (lambda (x) (+ copy-local-offset
+                                              (cadr (assq  x local-ids))))
                                (caddar code)))
                         (set-env-vectors
                           (onif-misc/map-indexed
@@ -114,7 +116,7 @@
                             registers))
                         (make-closure-addr
                           `((SET! (R ,(+ offset 2))
-                                  (M ,(string->symbol
+                                  (M2 ,(string->symbol
                                         (string-append
                                         "FUN"
                                         (number->string (cadar code))))))))
@@ -149,10 +151,9 @@
                        (R ,(+ register-offset 2))
                        (R ,(+ register-offset 1)))
             (CALL 1)))
-         ((FX+ FX- FX=?)
-            `((SET! (R ,(+ register-offset 1)) (R ,copy-offset))
-              (,operator (R ,(+ register-offset 1))
-                         (R ,(+ copy-offset 2))
+         ((FX+ FX- FX=? FX<?)
+            `((,operator (R ,(+ register-offset 1))
+                         (R ,(+ register-offset 2))
                          (R ,(+ register-offset 1)))
             (CALL 1)))
          (else (error "Undefined operator!" operator))))
@@ -160,28 +161,22 @@
      (define (%global-ref! name global-ids-box)
        (cond
          ((assq name (car global-ids-box))
-           => (lambda (id) `(G ,id)))
+           => (lambda (id-apair) `(G ,(cadr id-apair))))
          ((cadr global-ids-box)
            => (lambda (id)
                   (set-car!
                     global-ids-box
                     (cons
-                      (list name (+ id 1))
+                      (list name id)
                       (car global-ids-box)))
                   (set-cdr!  global-ids-box (list (+ 1 id)))
                   `(G ,id)))))
 
      (define (onif-like-asm/convert
-               code
-               register-offset
-               last-meta-info
-               global-ids-box
-               onif-symbol-hash
-               local-register-offset
-               jump-box)
+               code register-offset last-meta-info global-ids-box
+               onif-symbol-hash local-register-offset jump-box)
        (cond
-         ((not-pair? code)
-          (%atom-conv register-offset code))
+         ((not-pair? code) (%atom-conv register-offset code))
          ((onif-misc/ref-operations (car code) onif-symbol-hash)
           => (lambda (operator)
                 (let* ((arg-code
@@ -196,7 +191,7 @@
                          (%operation-conv operator register-offset (- local-register-offset 1))))
                   (append arg-code operation-code))))
          ((onif-misc/define-operator? (car code) onif-symbol-hash)
-          (let ((global (%global-ref! (cadr code) global-ids-box))
+          (let ((global (%global-ref! (caddr code) global-ids-box))
                 (asm-body
                   (%expand-arg
                     (list (cadr code)
@@ -292,7 +287,7 @@
                                                  0)
                                                (cadr key-val)))
                                         (R ,(+ (cadr key-val) 1))))
-                               local-ids))
+                           local-ids))
                   (_res (append res
                                 (list `(DEFUN
                                         ,(string->symbol
