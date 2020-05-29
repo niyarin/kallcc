@@ -1,12 +1,14 @@
 (include "./onif-symbol.scm")
 (include "./onif-idebug.scm")
 (include "./onif-misc.scm")
+(include "./lib/thread-syntax.scm")
 
 (define-library (onif meta-lambda)
    (import (scheme base)
            (scheme list);SRFI 1
            (scheme cxr)
            (onif idebug) (scheme write)
+           (only (niyarin thread-syntax) ->> ->)
            (onif misc)
            (onif symbol))
    (export onif-meta-lambda-conv
@@ -31,11 +33,17 @@
                  (cond ((assq 'base options) => cadr)(else #f)))
                (formals
                  (cond ((assq 'formals options) => cadr )(else '())))
+               (live-vars
+                 (cond ((assq 'live-vars options) => cadr )(else '())))
+               (use-symbols
+                 (cond ((assq 'use-symbols options) => cadr )(else '())))
                (contain-symbols
                  (cond ((assq 'contain-symbols options) => cadr )(else '()))))
             (list
               (list 'bind-names
                     (append (concatenate stack) formals))
+              (list 'live-vars live-vars)
+              (list 'use-symbols use-symbols)
               (list 'contain-symbols contain-symbols))))
 
      (define (onif-meta-lambda/update-meta-info meta-lambda-code key val)
@@ -65,10 +73,10 @@
 
      (define (%conv-meta-lambda cps-code onif-symbol-hash stk onif-expand-env)
        (cond
-         ((not (pair? cps-code)) cps-code)
+         ((not-pair? cps-code) cps-code)
          ((%lambda-operator? (car cps-code) onif-symbol-hash)
           (let* ((new-stk (cons (cadr cps-code) stk))
-                 (new-body
+                 (new-body;;複数body許容lambda
                    (map
                       (lambda (body)
                         (%conv-meta-lambda
@@ -77,25 +85,42 @@
                           new-stk
                           onif-expand-env))
                       (cddr cps-code)))
+                 (use-symbols
+                   (->> new-body
+                        (append-map (lambda (x) (if (not (list? x)) (list x) x)))
+                        (filter (lambda (x) (or (symbol? x) (onif-symbol? x))))))
+                 (concatenated-new-stk (concatenate new-stk))
+                 (live-vars
+                   (->> (concatenate (filter list? new-body))
+                        (map (lambda (x)
+                               (if (and (pair? x)
+                                        (%lambda-meta-operator? (car x) onif-symbol-hash))
+                                 (cadr (assq 'live-vars (caddr x)))
+                                 '())))
+                        (append use-symbols)
+                        (filter (lambda (sym) (memq sym concatenated-new-stk)))))
                  (symbol-list
+                   ;;あとで確保される変数
                    (map
                      (lambda (x)
                        (if (and (pair? x)
                                 (%lambda-meta-operator? (car x) onif-symbol-hash))
                          (cadr (assq 'contain-symbols (caddr x)))
                          '()))
-                     (apply append
-                            (filter list? new-body))))
+                     (concatenate (filter list? new-body))))
                  (contain-symbols
-                   (apply append (cons (cadr cps-code) symbol-list))))
-            `(,(onif-misc/onif-symbol-hash-ref onif-symbol-hash 'lambda-META)
-             ,(cadr cps-code)
-             ,(%make-meta-info
-               `(stack ,stk)
-               `(formals ,(cadr cps-code))
-               `(contain-symbols  ,contain-symbols))
-             .
-             ,new-body)))
+                   ;;あとで確保される変数 + 引数
+                   (concatenate (cons (cadr cps-code) symbol-list))))
+(onif-idebug/debug-display (cadr cps-code))(onif-idebug/debug-display live-vars)(newline) 
+            (cons* (onif-misc/onif-symbol-hash-ref onif-symbol-hash 'lambda-META)
+                   (cadr cps-code)
+                   (%make-meta-info
+                      `(stack ,stk)
+                      `(formals ,(cadr cps-code))
+                      `(live-vars ,live-vars)
+                      `(use-symbols ,use-symbols)
+                      `(contain-symbols  ,contain-symbols))
+                    new-body)))
          (else
            (map
               (lambda (x)
