@@ -40,11 +40,12 @@
                (contain-symbols
                  (cond ((assq 'contain-symbols options) => cadr )(else '()))))
             (list
-              (list 'bind-names
-                    (append (concatenate stack) formals))
-              (list 'live-vars live-vars)
-              (list 'use-symbols use-symbols)
-              (list 'contain-symbols contain-symbols))))
+              `(bind-names
+                    ,(append (concatenate stack) formals))
+              `(live-vars ,live-vars)
+              `(stack ,stack)
+              `(use-symbols ,use-symbols)
+              `(contain-symbols ,contain-symbols))))
 
      (define (onif-meta-lambda/update-meta-info meta-lambda-code key val)
         (list
@@ -111,7 +112,6 @@
                  (contain-symbols
                    ;;あとで確保される変数 + 引数
                    (concatenate (cons (cadr cps-code) symbol-list))))
-(onif-idebug/debug-display (cadr cps-code))(onif-idebug/debug-display live-vars)(newline) 
             (cons* (onif-misc/onif-symbol-hash-ref onif-symbol-hash 'lambda-META)
                    (cadr cps-code)
                    (%make-meta-info

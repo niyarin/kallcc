@@ -9,6 +9,7 @@
 (include "./onif-name-ids.scm")
 (include "./onif-alpha-conv.scm")
 (include "./onif-like-asm.scm")
+(include "./onif-new-asm.scm")
 
 (define-library (onif phases)
    (import (scheme base)
@@ -26,6 +27,7 @@
            (onif alpha conv)
            (onif flat-lambda)
            (onif like-asm)
+           (onif new-asm)
            (onif expand)
            (onif cps))
    (export onif-phases/pre-expand
@@ -38,15 +40,14 @@
            onif-phase/make-name-local-ids
            onif-phase/flat-lambda
            onif-phases/cps-conv
-           onif-phase/asm)
+           onif-phase/asm
+           onif-phase/new-asm)
    (begin
      (define (onif-phases/pre-expand code global)
        (let* ((expression-begin-removed
-                (apply
-                  append
-                  (map (lambda (expression)
-                         (onif-expand/remove-outer-begin expression global))
-                       code)))
+                (append-map (lambda (expression)
+                       (onif-expand/remove-outer-begin expression global))
+                       code))
               (namespaces
                  (onif-expand/separate-namespaces
                    expression-begin-removed
@@ -69,8 +70,7 @@
                          (list (list 'syntax-symbol-hash new-global)
                                (list 'original-syntax-symbol-hash (onif-scm-env-tiny-core))
                                (list 'import-libraries
-                                     (filter (lambda (libname) (not (onif-expand/core-library-name? libname)))
-                                             (cdar expressions))))))
+                                     (remove onif-expand/core-library-name?  (cdar expressions))))))
                    (loop (cdr expressions)
                          new-global
                          new-expand-environment)))
@@ -163,9 +163,9 @@
                      (map (lambda (namespace)
                             (list
                               (car namespace)
-                              (cons `(body ,(cddr namespace))
-                                    (cons `(name ,(car namespace))
-                                          (cadr namespace))))))))
+                              (cons* `(body ,(cddr namespace))
+                                     `(name ,(car namespace))
+                                      (cadr namespace)))))))
                (imported-rename
                  (begin
                     (map (lambda (namespace rename-alist)
@@ -247,7 +247,7 @@
                                  '())
                            ;Current data format is ((flat code id-lambdas) ...)
                            ((lambda (expression-offsets)
-                              (let ((lambdas (apply append (map cadr expression-offsets))))
+                              (let ((lambdas   (append-map cadr expression-offsets)))
                                  (onif-misc/ft-pair-push!
                                    res
                                    `(,(car namespace)
@@ -298,5 +298,48 @@
             (append
               (concatenate  funs)
               '((COMMENT "BODY"))
-              (apply append bodies)
-              '((BODY-START) (HALT)))))))
+              (concatenate bodies)
+              '((BODY-START) (HALT)))))
+
+      (define (%new-asm-funs namespaces global-ids-box jump-box)
+        (->> namespaces
+             (map (lambda (namespace)
+                    (->> (%namespace-assq 'id-lambdas namespace)
+                         ((lambda (id-lambdas)
+                              (onif-new-asm/asm-fun
+                                       id-lambdas '(1) 0 '() '();body use-registers offset lock local-register
+                                       '()
+                                       global-ids-box
+                                       jump-box
+                                       (%namespace-assq 'syntax-symbol-hash
+                                                        namespace)))))))
+             concatenate))
+
+      (define (%new-asm-body namespaces global-ids-box jump-box)
+        (->> namespaces
+              (map (lambda (namespace)
+                     (->> (reverse (%namespace-assq 'body namespace))
+                          (append-map
+                            (lambda (body)
+                                 (cons
+                                   '(BODY-START)
+                                   (onif-new-asm/convert
+                                       body '(()) 0 '() '();body use-registers offset lock local-register
+                                       '()
+                                       global-ids-box
+                                       jump-box
+                                       (%namespace-assq 'syntax-symbol-hash
+                                                        namespace)))))
+                          onif-new-asm/tune)))))
+
+       (define (onif-phase/new-asm namespaces)
+           (let* ((global-ids-box (onif-new-asm/make-global-ids-box))
+                  (jump-box (list 0))
+                  (bodies (%new-asm-body namespaces global-ids-box jump-box))
+                  (_ (begin (onif-idebug/debug-display (concatenate bodies))(newline)))
+                  (funs (%new-asm-funs namespaces global-ids-box jump-box)))
+               (append
+                 funs
+                 (concatenate bodies)
+                 '((BODY-START)
+                   (HALT)))))))

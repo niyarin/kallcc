@@ -42,7 +42,8 @@
                    (new-body (%flat-conv
                                (cadddr code)
                                lambdas-box
-                               (caddr code)
+                               (cons (list 'frame (cadr code))
+                                     (caddr code))
                                offset-box
                                symbol-hash
                                expand-environment))
@@ -59,6 +60,10 @@
                            prev-contain-symbols
                            (cadr (assq 'contain-symbols (caddr code))))
                         (cadr code)))
+                   (last-frame
+                     (cond
+                       ((assq 'frame prev-info) => cadr)
+                       (else '())))
                    (new-lambda
                      (onif-meta-lambda/update-meta-info-body
                        code
@@ -74,7 +79,8 @@
                   (list
                     (onif-misc/onif-symbol-hash-ref symbol-hash 'LFUN)
                     id
-                    contain-symbols))))
+                    contain-symbols
+                    last-frame))))
          (else
            (->> code
                (map (lambda (x)
