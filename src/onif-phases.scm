@@ -173,6 +173,7 @@
                               (cons* `(body ,(cddr namespace))
                                      `(name ,(car namespace))
                                       (cadr namespace)))))))
+               (namespaces (reverse namespaces))
                (imported-rename
                  (begin
                     (map (lambda (namespace rename-alist)
