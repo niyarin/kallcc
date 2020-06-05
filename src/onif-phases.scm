@@ -10,6 +10,7 @@
 (include "./onif-alpha-conv.scm")
 (include "./onif-like-asm.scm")
 (include "./onif-new-asm.scm")
+(include "./onif-opt-names.scm")
 
 (define-library (onif phases)
    (import (scheme base)
@@ -30,7 +31,8 @@
            (onif like-asm)
            (onif new-asm)
            (onif expand)
-           (onif cps))
+           (onif cps)
+           (onif opt names))
    (export onif-phases/pre-expand
            onif-phases/expand-namespaces
            onif-phases/solve-imported-name
