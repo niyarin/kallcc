@@ -13,6 +13,7 @@
 
 (define-library (onif phases)
    (import (scheme base)
+           (scheme list)
            (onif misc)
            (scheme cxr)
            (scheme write);
@@ -136,16 +137,18 @@
                        ))))
 
       (define (onif-phases/solve-imported-symbol namespaces)
+        "Return alist for import symbols. ((symbol rename-onif-symbol) ...)"
         (->> namespaces
              (map (lambda (namespace)
-                    (let* ((import-libnames (%namespace-assq 'import-libraries namespace))
+                    (let* ((import-libnames
+                             (%namespace-assq 'import-libraries namespace))
                            (import-symbols
                              (->> import-libnames
                                   (map (lambda (libname)
                                           (->> (assv libname namespaces)
                                                (%namespace-assq
                                                  'export-rename))))
-                                  (apply append))))
+                                  concatenate)))
                        import-symbols)))))
 
       (define (onif-phases/first-stage code expand-environment)
@@ -154,7 +157,9 @@
                 (namespaces
                   (onif-phases/pre-expand code (onif-scm-env-tiny-core)))
                 (expanded-namespaces
-                  (onif-phases/expand-namespaces (cadar namespaces) (cdr namespaces) expand-environment))
+                  (onif-phases/expand-namespaces (cadar namespaces)
+                                                 (cdr namespaces)
+                                                 expand-environment))
                 (alpha-converted-code
                   (begin (onif-phases/alpha-conv! expanded-namespaces global)
                          expanded-namespaces))
@@ -175,7 +180,8 @@
                                 (for-each (lambda (expression)
                                               (onif-alpha/simple-conv!
                                                 expression
-                                                rename-alist)))))
+                                                rename-alist
+                                                global)))))
                          namespaces
                          (onif-phases/solve-imported-symbol namespaces))
                     namespaces)))
