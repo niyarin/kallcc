@@ -322,7 +322,8 @@
                                        jump-box
                                        (%namespace-assq 'syntax-symbol-hash
                                                         namespace)))))))
-             concatenate))
+             concatenate
+             onif-new-asm/tune))
 
       (define (%new-asm-body namespaces global-ids-box jump-box)
         (->> namespaces

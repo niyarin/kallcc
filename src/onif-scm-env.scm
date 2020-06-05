@@ -41,7 +41,7 @@
                        (set-car! . (built-in-car ,(onif-symbol 'SET-CAR!)))
                        (set-cdr! . (built-in-car ,(onif-symbol 'SET-CDR!)))
                        (cons . (built-in-cons ,(onif-symbol 'CONS)))
-                       (null? . (built-in-null? ,(onif-symbol 'NULL?)))
+                       (eq? . (built-in-eq? ,(onif-symbol 'EQ?)))
                        (pair? . (built-in-pair? ,(onif-symbol 'PAIR?)))
 
                        (fx+ . (built-in-fx+ ,(onif-symbol 'FX+)))

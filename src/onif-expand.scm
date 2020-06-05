@@ -176,7 +176,7 @@
                               'quote
                               expand-environment))
                         (cadr scm-code)))
-              ((built-in-car built-in-cdr built-in-cons built-in-null?
+              ((built-in-car built-in-cdr built-in-cons built-in-eq?
                 built-in-fx+ built-in-fx- built-in-fx* built-in-fx=? built-in-fx<?)
                (cons
                  (cadr operator)

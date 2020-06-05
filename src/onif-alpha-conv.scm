@@ -40,13 +40,14 @@
                (lseq-car (lseq-cdr x))))
          (else symbol)))
 
-     (define (onif-alpha/simple-conv! code comv-table)
+     (define (onif-alpha/simple-conv! code conv-table onif-symbol-hash)
        (let loop ((code code))
          (cond
            ((and (symbol? code)
-                 (assq code comv-table))
+                 (assq code conv-table))
             => cadr)
            ((not-pair? code) code)
+           ((onif-misc/quote-operator? (car code) onif-symbol-hash) code)
            (else
              (begin
                 (->> code
@@ -85,15 +86,12 @@
                                        (list x x))))
                                formals)))
                     (begin
-                       (set-car!
-                         (cdr code)
-                         (map cadr stack-cell))
-                       (set-cdr!
-                         (cdr code)
-                          (map
-                            (lambda (body)
-                               (loop body (cons stack-cell stk)))
-                            (cddr code)))
+                       (set-car!  (cdr code) (map cadr stack-cell))
+                       (set-cdr!  (cdr code)
+                                  (map
+                                     (lambda (body)
+                                        (loop body (cons stack-cell stk)))
+                                     (cddr code)))
                        code)))
                  (else
                    (onif-misc/for-each-cell1

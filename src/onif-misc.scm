@@ -68,7 +68,7 @@
        (if (not (onif-symbol? operator))
          #f
          (case (onif-symbol/ref-symbol operator)
-            ((CONS CAR CDR PAIR? SET-CAR! SET-CDR! FX+ FX- FX= FX<?)
+            ((CONS CAR CDR PAIR? SET-CAR! SET-CDR! FX+ FX- FX= FX<? EQ?)
              => (lambda (x) x))
             (else #f))))
 

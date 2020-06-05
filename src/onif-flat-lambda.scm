@@ -27,13 +27,8 @@
        ;;第二引数にないものだけを第一引数からとる
        (remove (lambda (x) (member x ls2)) ls1))
 
-     (define (%flat-conv
-               code
-               lambdas-box
-               prev-info
-               offset-box
-               symbol-hash
-               expand-environment)
+     (define (%flat-conv code lambdas-box prev-info
+                         offset-box symbol-hash expand-environment)
        (cond
          ((not-pair? code) code)
          ((%lambda-meta-operator? (car code) symbol-hash);<= ONLY body is 1.
@@ -83,13 +78,13 @@
                     last-frame))))
          (else
            (->> code
-               (map (lambda (x)
-                        (%flat-conv x
-                                    lambdas-box
-                                    prev-info
-                                    offset-box
-                                    symbol-hash
-                                    expand-environment)))))))
+                (map (lambda (x)
+                         (%flat-conv x
+                                     lambdas-box
+                                     prev-info
+                                     offset-box
+                                     symbol-hash
+                                     expand-environment)))))))
 
      (define (onif-flat-flat-code&id-lambdas
                code

@@ -31,6 +31,9 @@
               (loop (cdr code)
                     (cons '(COMMENT "BODY-START")
                          (cdr rev-res))))
+             ((and (eq? (caar code) 'SET!)
+                   (equal? (cadar code) (caddar code)))
+              (loop (cdr code) rev-res))
              (else (loop (cdr code) (cons (car code) rev-res))))))
 
      (define (%global-ref! name global-ids-box)
@@ -140,6 +143,10 @@
            ((%lfun? (car code) onif-symbol-hash)
             (%asm-lfun code use-registers to-register-offset
                        lock-registers local-register global-ids-box))
+           ((onif-misc/quote-operator? (car code) onif-symbol-hash)
+               (if (null? (cadr code))
+                 `((SET! (R ,to-register-offset) ()))
+                 (error "TBA!!")))
            (else (error "TBA33" (onif-idebug-icode->code code)))))
 
      (define (%asm-args args use-registers to-register-offset
@@ -163,11 +170,14 @@
              (body (%asm-arg1 (cadddr code) use-registers register-offset
                               lock-registers local-register global-ids-box onif-symbol-hash))
              (continuation (cadr code)))
-         (if (null? continuation)
+         (if (and (null? continuation) (null? local-register))
            `(,@body
               (SET! ,global (R ,register-offset))
               (CONCATENATE-BODY))
-           (error "TBA define"))))
+           `(,@body
+              (SET! ,global (R ,register-offset))
+              (SET! (R 0) ())
+              (CALL 1)))))
 
 ; (define (onif-new-asm/convert code use-registers register-offset lock-registers local-register env global-ids-box jump-box onif-symbol-hash)
      (define (%asm-if code register-offset use-registers
@@ -195,15 +205,33 @@
         (let* ((args (%asm-args (cdr code) use-registers register-offset lock-registers local-register global-ids-box onif-symbol-hash))
                (cont (%safety-register register-offset 0 lock-registers))
                (r1 (%safety-register register-offset 0 (cons cont lock-registers)))
-               (r2 (%safety-register register-offset 0 (cons* cont r1 lock-registers))))
-              (display "FXXXXXXXXXXXXXXXXX")(display ope)(onif-idebug/debug-display code)(newline)
+               (r2 (%safety-register register-offset 0 (cons* cont r1 lock-registers)))
+               (r3 (%safety-register register-offset
+                                     0
+                                     (cons* cont r1 r2 lock-registers))))
           (case ope
+            ((CONS)
+             `(,@args
+               (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
+                (,ope (R ,r1)
+                      (R ,r2)
+                      (R ,r3))
+                (SET! (R ,r1) (R ,r3))))
+            ((CAR CDR)
+              `(,@args
+               (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
+               (,ope (R ,r1)
+                     (R ,r1))))
             ((FX+ FX- FX<?)
              `(,@args
                (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
                (,ope (R ,r1)
                     (R ,r2)
                     (R ,r1))))
+            ((EQ?)
+              `(,@args
+               (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
+               (EQ? (R ,r1) (R ,r2) (R ,r1))))
             (else (error "AAAAAAAAAAAAAAAAAAAAAAA" ope)))))
 
       ;(%asm-arg1 code use-registers to-register-offset
