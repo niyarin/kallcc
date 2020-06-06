@@ -129,14 +129,11 @@
 
       (define (%namespace-assq key namespace . default)
         (cond
+          ((not namespace) (error "Namespace is null"))
           ((assq key (cadr namespace)) => cadr)
           ((not (null? default)) (car default))
           (else (error "Namespace doesn't have key."
-                       key
-                       ;(->> (cadr namespace) (map car))
-                       namespace
-                       ;(cadr namespace)
-                       ))))
+                       key namespace))))
 
       (define (onif-phases/solve-imported-symbol namespaces)
         "Return alist for import symbols. ((symbol rename-onif-symbol) ...)"
@@ -147,7 +144,7 @@
                            (import-symbols
                              (->> import-libnames
                                   (map (lambda (libname)
-                                          (->> (assv libname namespaces)
+                                          (->> (assoc libname namespaces)
                                                (%namespace-assq
                                                  'export-rename))))
                                   concatenate)))
@@ -173,7 +170,6 @@
                               (cons* `(body ,(cddr namespace))
                                      `(name ,(car namespace))
                                       (cadr namespace)))))))
-               (namespaces (reverse namespaces))
                (imported-rename
                  (begin
                     (map (lambda (namespace rename-alist)
