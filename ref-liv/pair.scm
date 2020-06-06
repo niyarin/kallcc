@@ -1,6 +1,6 @@
 (define-library (onif-lib pair)
    (import (onif-lib core))
-   (export caar cadr cdar cddr)
+   (export caar cadr cdar cddr null?)
    (begin
      (define caar
        (lambda (x)
