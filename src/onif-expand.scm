@@ -3,6 +3,7 @@
 (include "./onif-misc.scm");
 (include "./lib/thread-syntax.scm")
 (include "./onif-idebug.scm")
+(include "./lib/rules.scm")
 
 ;TODO:fix import expression
 
@@ -69,6 +70,11 @@
           ((assv symbol expand-environment) => cadr)
           ;error
           ))
+
+     (define-record-type <onif-macro>
+         (%onif-macro rule-code)
+         %onif-macro?
+         (rule-code %macro-ref-rule-code %macro-set-rule-code!))
 
      (define (%expand-environment-syntax-symbol-hash-ref
                symbol
@@ -177,7 +183,10 @@
                               expand-environment))
                         (cadr scm-code)))
               ((built-in-car built-in-cdr built-in-cons built-in-eq?
-                built-in-fx+ built-in-fx- built-in-fx* built-in-fx=? built-in-fx<?)
+                built-in-fx+ built-in-fx- built-in-fx* built-in-fx=?
+                built-in-fx<?
+                built-in-make-bytevector built-in-bytevector-u8-ref
+                built-in-bytevector-u8-set!)
                (cons
                  (cadr operator)
                  (map
@@ -216,10 +225,8 @@
            ((and (pair? scm-code) (symbol? (car scm-code)))
             (let ((operator (%lookup-environment (car scm-code) global stack)))
                (%list-expand operator scm-code global stack expand-environment)))
-           ((and (pair? scm-code) (list? (car scm-code)))
-            )
-           (else
-             scm-code)))
+           ((and (pair? scm-code) (list? (car scm-code))))
+           (else scm-code)))
 
      (define (onif-expand/remove-outer-begin scm-code global)
        (let remove-begin ((code scm-code))
@@ -279,15 +286,14 @@
        (equal? lib-name '(onif-lib core)))
 
      (define (onif-expand/make-environment lib-names)
-       (fold
-         (lambda (lib-name env)
-           (cond
-             ((onif-expand/core-library-name? lib-name)
-              (hash-table-merge! env (onif-scm-env-tiny-core)))
-             (else
-               env)))
-         (make-hash-table eq?)
-         lib-names))
+       "Make environment from onif libraries such as (onif core) included lib-names"
+       (fold (lambda (lib-name env)
+               (cond
+                  ((onif-expand/core-library-name? lib-name)
+                     (hash-table-merge! env (onif-scm-env-tiny-core)))
+                  (else env)))
+              (make-hash-table eq?)
+              lib-names))
 
      (define (onif-expand/defined-symbols expressions symbol-hash)
        (->> expressions

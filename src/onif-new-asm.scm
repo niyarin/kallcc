@@ -222,6 +222,12 @@
                (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
                (,ope (R ,r1)
                      (R ,r1))))
+            ((SET-CAR! SET-CDR!)
+               `(,@args
+                 (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
+                 (,ope (R ,r1)
+                       (R ,r2)
+                       (R ,r3))))
             ((FX+ FX- FX<?)
              `(,@args
                (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
@@ -232,6 +238,12 @@
               `(,@args
                (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
                (EQ? (R ,r1) (R ,r2) (R ,r1))))
+            ((MAKE-BYTEVECTOR)
+             `(,@args
+               (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
+               (BYTEVECTOR ,(caddr code)
+                           (R ,r1)
+                           (R ,r2))))
             (else (error "AAAAAAAAAAAAAAAAAAAAAAA" ope)))))
 
       ;(%asm-arg1 code use-registers to-register-offset

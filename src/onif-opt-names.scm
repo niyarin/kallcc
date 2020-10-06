@@ -14,6 +14,7 @@
                (set! res (cons code res)))
               ((not (pair? code)))
               ((onif-misc/define-operator? (car code) onif-symbol-hash)
+               (display "###############")(onif-idebug/debug-display (cadddr code))(newline)
                (loop (cadddr code)))
               ((onif-misc/lambda-meta-operator? (car code) onif-symbol-hash)
                (for-each loop (cdddr code)))

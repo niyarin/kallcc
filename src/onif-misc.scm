@@ -3,6 +3,7 @@
 
 (define-library (onif misc)
    (import (scheme base)
+           (scheme list)
            (srfi 125)
            (scheme write)
            (onif idebug);
@@ -30,7 +31,7 @@
            (onif-symbol/onif-symbol? obj)))
 
      (define (onif-misc/const? obj)
-       (and (not (pair? obj))
+       (and (not-pair? obj)
             (not (onif-misc/var? obj))))
 
      (define (onif-misc/make-check-onif-symbol-base-function target-symbol)
@@ -68,7 +69,8 @@
        (if (not (onif-symbol? operator))
          #f
          (case (onif-symbol/ref-symbol operator)
-            ((CONS CAR CDR PAIR? SET-CAR! SET-CDR! FX+ FX- FX= FX<? EQ?)
+            ((CONS CAR CDR PAIR? SET-CAR! SET-CDR! FX+ FX- FX= FX<? EQ?
+              BYTEVECTOR-U8-REF BYTEVECTOR-U8-SET! MAKE-BYTEVECTOR)
              => (lambda (x) x))
             (else #f))))
 

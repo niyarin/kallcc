@@ -13,40 +13,21 @@
 (include "./onif-opt-names.scm")
 
 (define-library (onif phases)
-   (import (scheme base)
-           (scheme list)
-           (onif misc)
-           (scheme cxr)
+   (import (scheme base) (scheme list) (scheme cxr) (srfi 69);scheme hash
            (scheme write);
-           (onif idebug)
-           (srfi 1)
-           (srfi 69);
            (only (niyarin thread-syntax) ->> ->)
-           (onif symbol)
-           (onif scm env)
-           (onif meta-lambda)
-           (onif name-ids)
-           (onif alpha conv)
-           (onif flat-lambda)
-           (onif like-asm)
-           (onif new-asm)
-           (onif expand)
-           (onif cps)
-           (onif opt names))
-   (export onif-phases/pre-expand
-           onif-phases/expand-namespaces
-           onif-phases/solve-imported-name
-           onif-phases/solve-imported-symbol
-           onif-phases/alpha-conv!
-           onif-phases/first-stage
-           onif-phase/meta-lambda
-           onif-phase/make-name-local-ids
-           onif-phase/flat-lambda
-           onif-phases/cps-conv
-           onif-phase/asm
+           (onif idebug) (onif symbol) (onif scm env)
+           (onif meta-lambda) (onif name-ids) (onif alpha conv) (onif flat-lambda) (onif misc)
+           (onif like-asm) (onif new-asm) (onif expand) (onif cps) (onif opt names))
+   (export onif-phases/pre-expand onif-phases/expand-namespaces
+           onif-phases/solve-imported-name onif-phases/solve-imported-symbol
+           onif-phases/alpha-conv! onif-phases/first-stage
+           onif-phase/meta-lambda onif-phase/make-name-local-ids
+           onif-phase/flat-lambda onif-phases/cps-conv onif-phase/asm
            onif-phase/new-asm)
    (begin
      (define (onif-phases/pre-expand code global)
+       "Removes global begin and splites source code based on namespace."
        (let* ((expression-begin-removed
                 (append-map (lambda (expression)
                        (onif-expand/remove-outer-begin expression global))
@@ -55,7 +36,34 @@
                  (onif-expand/separate-namespaces
                    expression-begin-removed
                    global)))
-             namespaces))
+           namespaces))
+
+     (define (%sort-libraries namespaces global)
+       ;;ここのglobalはほんとは正しくない(importが(scheme base)のimportじゃない場合等でこの手続きは正しく動作しない)
+       (let* ((libname-imported-libnames-list
+                (->> namespaces
+                     (map (lambda (namespace)
+                            (->> (cadr namespace)
+                                (filter (lambda (expression)
+                                            (onif-expand/import-expression?
+                                              expression
+                                              global)))
+                                 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;(rename ...)とかの処理が未実装
+                                 (map cdr)
+                                 concatenate
+                                 delete-duplicates
+                                 (cons (car namespace)))))))
+              (libname-table
+                (->> (concatenate libname-imported-libnames-list)
+                     delete-duplicates
+                     (onif-misc/map-indexed
+                       (lambda (index namespace)
+                         (cons namespace index))))))
+         (->> libname-imported-libnames-list
+              (map (lambda (namespace)
+                     (map (lambda (libname)
+                            (cdr (assoc libname libname-table)))
+                          namespace))))))
 
       (define (%expand-loop expressions global expand-environment other-namespaces)
         ;TODO: import macros from other namespaces
@@ -66,14 +74,13 @@
              (cond
                ((null? expressions)
                 (cons expand-environment
-                     (onif-misc/ft-pair-res res)))
+                      (onif-misc/ft-pair-res res)))
                ((onif-expand/import-expression?  (car expressions) global)
                 (let* ((new-global (onif-expand/make-environment (cdar expressions)))
                        (new-expand-environment
-                         (list (list 'syntax-symbol-hash new-global)
-                               (list 'original-syntax-symbol-hash (onif-scm-env-tiny-core))
-                               (list 'import-libraries
-                                     (remove onif-expand/core-library-name?  (cdar expressions))))))
+                         `((syntax-symbol-hash ,new-global)
+                           (original-syntax-symbol-hash ,(onif-scm-env-tiny-core))
+                           (import-libraries ,(remove onif-expand/core-library-name?  (cdar expressions))))))
                    (loop (cdr expressions)
                          new-global
                          new-expand-environment)))

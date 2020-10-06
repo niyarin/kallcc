@@ -34,7 +34,6 @@
                        (define-library . (built-in-define-library ,(onif-symbol 'DEFINE-LIBRARY-SYNTAX)))
                        (import . (built-in-import ,(onif-symbol 'IMPORT-SYNTAX)))
                        (export . (built-in-export ,(onif-symbol 'IMPORT-EXPORT)))
-                       (define-library . (built-in-cons ,(onif-symbol 'CONS)))
 
                        (car . (built-in-car ,(onif-symbol 'CAR)))
                        (cdr . (built-in-cdr ,(onif-symbol 'CDR)))
@@ -54,6 +53,11 @@
                        (fxand . (built-in-fxand ,(onif-symbol 'FXAND)))
                        (fxior . (built-in-fxior ,(onif-symbol 'FXIOR)))
                        (fxnot . (built-in-fxnot ,(onif-symbol 'FXNOT)))
+
+                       (bytevector-u8-ref . (built-in-bytevector-u8-ref ,(onif-symbol 'BYTEVECTOR-U8-REF)))
+                       (bytevector-u8-set! . (built-in-bytevector-u8-set! ,(onif-symbol 'BYTEVECTOR-U8-SET!)))
+                       (make-bytevector . (built-in-make-bytevector ,(onif-symbol 'MAKE-BYTEVECTOR)))
+
 
                        (DEFUN . (internal-defun-operator ,(onif-symbol 'DEFUN-INTERNAL)))
                        (LFUN . (internal-lfun-operator ,(onif-symbol 'LFUN-INTERNAL)))
