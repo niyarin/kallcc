@@ -244,6 +244,11 @@
                (BYTEVECTOR ,(caddr code)
                            (R ,r1)
                            (R ,r2))))
+            ((BYTEVECTOR-U8-REF)
+             `(,@args
+                (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
+                (BYTEVECTOR-U8-REF (R ,r1) (R ,r2) (R ,r3))
+                (SET! (R ,r1) (R ,r3))))
             (else (error "AAAAAAAAAAAAAAAAAAAAAAA" ope)))))
 
       ;(%asm-arg1 code use-registers to-register-offset
