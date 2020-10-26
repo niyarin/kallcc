@@ -70,7 +70,7 @@
          #f
          (case (onif-symbol/ref-symbol operator)
             ((CONS CAR CDR PAIR? SET-CAR! SET-CDR! FX+ FX- FX= FX<? EQ?
-              BYTEVECTOR-U8-REF BYTEVECTOR-U8-SET! MAKE-BYTEVECTOR)
+              BYTEVECTOR-U8-REF BYTEVECTOR-U8-SET! MAKE-BYTEVECTOR BYTEVECTOR-LENGTH)
              => (lambda (x) x))
             (else #f))))
 

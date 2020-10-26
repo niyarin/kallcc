@@ -50,7 +50,8 @@
                   (set-cdr!  global-ids-box (list (+ 1 id)))
                   `(G ,id)))))
 
-     (define (%asm-conv register code)
+     (define (%asm-const-conv register code)
+       ;;TODO::ここのintegerの部分128の大小比較が変なので見直す
          (cond
            ((char? code)
             `(SET! (R ,register) ,code))
@@ -60,7 +61,7 @@
             `(SET! (R ,register) ,code))
            ((and (integer? code) (< code 128))
               (error "TBA 3" (onif-idebug-icode->code code)))
-           (else (error "TBA 3" (onif-idebug-icode->code code)))))
+           (else (error "TBA (unsupported object type.)" (onif-idebug-icode->code code)))))
 
      (define (%asm-var var to-register-offset lock-registers local-register global-ids-box)
        (cond
@@ -129,12 +130,37 @@
                                   (R ,to-register-offset)))))
             (append  null-set make-closure-addr make-closure)))
 
+
+     (define (%asm-byte-vector bv to-register-offset lock-registers)
+       ;;外側という前提
+       (let* ((r1 to-register-offset)
+              (r2 (%safety-register to-register-offset 1 lock-registers))
+              (r3 (%safety-register to-register-offset 2 lock-registers))
+              (length-set-code
+                `(SET! (R ,r2)
+                       ,(bytevector-length bv)))
+              (make-bv `(BYTEVECTOR
+                         (R ,r2)
+                         (R ,r1))))
+
+         (let loop ((i 0)
+                    (res (list make-bv length-set-code)))
+           (if (< i (bytevector-length bv))
+             (loop (+ i 1)
+                   (cons* `(BYTEVECTOR-U8-SET! (R ,r1) (R ,r2) (R ,r3))
+                          `(SET! (R ,r3) ,(bytevector-u8-ref bv i))
+                          `(SET! (R ,r2) ,i)
+                          res))
+             (reverse res)))))
+
      (define (%asm-arg1 code use-registers to-register-offset
                         lock-registers local-register global-ids-box
                         onif-symbol-hash)
          ;;返り値は順方向
          (cond
-           ((onif-misc/const? code) `(,(%asm-conv to-register-offset code)))
+           ((bytevector? code)
+            (%asm-byte-vector code to-register-offset lock-registers))
+           ((onif-misc/const? code) `(,(%asm-const-conv to-register-offset code)))
            ((onif-misc/var? code) (%asm-var code to-register-offset
                                             lock-registers local-register global-ids-box))
            ((null? (car code))
@@ -179,7 +205,6 @@
               (SET! (R 0) ())
               (CALL 1)))))
 
-; (define (onif-new-asm/convert code use-registers register-offset lock-registers local-register env global-ids-box jump-box onif-symbol-hash)
      (define (%asm-if code register-offset use-registers
                       lock-registers local-register jump-box env global-ids-box onif-symbol-hash)
         (onif-idebug/debug-display code)(newline)
@@ -255,6 +280,10 @@
                 (BYTEVECTOR-U8-SET! (R ,r1) (R ,r2) (R ,r3))
                 ;;;;;RET UNDEF?
                 ))
+            ((BYTEVECTOR-LENGTH)
+             `(,@args
+                (COMMENT ATGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
+                (BYTEVECTOR-LENGTH (R ,r1) (R,r2))))
             (else (error "AAAAAAAAAAAAAAAAAAAAAAA" ope)))))
 
       ;(%asm-arg1 code use-registers to-register-offset
@@ -372,7 +401,7 @@
 
    (define (%asm-fun id-fun use-registers register-offset lock-registers local-register
                      env global-ids-box jump-box onif-symbol-hash)
-      (let* ((f-id (car id-fun))
+      (let* ((function-id (car id-fun))
              (meta-function (cadr id-fun))
              (meta-info (caddr meta-function))
              (formals (cadr meta-function))
@@ -411,17 +440,16 @@
              (another-register
                (%safety-register (+ (length free-vars) (length formals) 2) 0 new-lock-registers))
              (asm-body
-               (onif-new-asm/convert
-                 body use-registers register-offset
-                 new-lock-registers
-                 new-local-register
-                 (cons (caddr meta-function) env)
-                 global-ids-box jump-box onif-symbol-hash)))
+               (onif-new-asm/convert body use-registers register-offset
+                                     new-lock-registers
+                                     new-local-register
+                                     (cons (caddr meta-function) env)
+                                     global-ids-box jump-box onif-symbol-hash)))
            ; (display "FVAR >>")(display free-vars-expand)(newline)
            ; (display "FORMALS >>")(display formals)(newline)
            ; (display "FREE VARS")(display free-vars)(newline)
             ;(display "RRR")(display another-register)(newline)(newline)
-         (append (list `(DEFUN ,(%make-symbol "FUN" f-id))
+         (append (list `(DEFUN ,(%make-symbol "FUN" function-id))
                        '(CLOSURE-ENV (R 0) (R 1))
                        `(COMMENT ,(list 'formals (onif-idebug-icode->code formals))))
                  free-vars-expand

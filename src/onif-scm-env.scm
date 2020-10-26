@@ -57,7 +57,7 @@
                        (bytevector-u8-ref . (built-in-bytevector-u8-ref ,(onif-symbol 'BYTEVECTOR-U8-REF)))
                        (bytevector-u8-set! . (built-in-bytevector-u8-set! ,(onif-symbol 'BYTEVECTOR-U8-SET!)))
                        (make-bytevector . (built-in-make-bytevector ,(onif-symbol 'MAKE-BYTEVECTOR)))
-
+                       (bytevector-length . (built-in-bytevector-length ,(onif-symbol 'BYTEVECTOR-LENGTH)))
 
                        (DEFUN . (internal-defun-operator ,(onif-symbol 'DEFUN-INTERNAL)))
                        (LFUN . (internal-lfun-operator ,(onif-symbol 'LFUN-INTERNAL)))
