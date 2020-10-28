@@ -47,9 +47,10 @@
                        (fx- . (built-in-fx- ,(onif-symbol 'FX-)))
                        (fx* . (built-in-fx* ,(onif-symbol 'FX*)))
                        (fxquotient . (built-in-fxquotient ,(onif-symbol 'FXQUOTIENT)))
+                       (fxremainder . (built-in-fxremainder ,(onif-symbol 'FXREMAINDER)))
                        (fx=? . (built-in-fx=? ,(onif-symbol 'FX=?)))
-                       (fx>? . (built-in-fx=? ,(onif-symbol 'FX>?)))
-                       (fx<? . (built-in-fx=? ,(onif-symbol 'FX<?)))
+                       (fx>? . (built-in-fx>? ,(onif-symbol 'FX>?)))
+                       (fx<? . (built-in-fx<? ,(onif-symbol 'FX<?)))
                        (fxand . (built-in-fxand ,(onif-symbol 'FXAND)))
                        (fxior . (built-in-fxior ,(onif-symbol 'FXIOR)))
                        (fxnot . (built-in-fxnot ,(onif-symbol 'FXNOT)))
@@ -60,8 +61,7 @@
                        (bytevector-length . (built-in-bytevector-length ,(onif-symbol 'BYTEVECTOR-LENGTH)))
 
                        (DEFUN . (internal-defun-operator ,(onif-symbol 'DEFUN-INTERNAL)))
-                       (LFUN . (internal-lfun-operator ,(onif-symbol 'LFUN-INTERNAL)))
-                       ))
+                       (LFUN . (internal-lfun-operator ,(onif-symbol 'LFUN-INTERNAL)))))
                res)))))
 
      (define (onif-scm-env/make-env-for-library)

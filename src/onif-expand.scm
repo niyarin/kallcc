@@ -184,6 +184,7 @@
                         (cadr scm-code)))
               ((built-in-car built-in-cdr built-in-cons built-in-eq?
                 built-in-fx+ built-in-fx- built-in-fx* built-in-fx=?
+                built-in-fxremainder
                 built-in-fx<?  built-in-make-bytevector
                 built-in-bytevector-u8-ref built-in-bytevector-u8-set!
                 built-in-bytevector-length)

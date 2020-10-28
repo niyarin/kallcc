@@ -136,15 +136,12 @@
        (let* ((r1 to-register-offset)
               (r2 (%safety-register to-register-offset 1 lock-registers))
               (r3 (%safety-register to-register-offset 2 lock-registers))
-              (length-set-code
-                `(SET! (R ,r2)
-                       ,(bytevector-length bv)))
               (make-bv `(BYTEVECTOR
-                         (R ,r2)
+                         ,(bytevector-length bv)
                          (R ,r1))))
 
          (let loop ((i 0)
-                    (res (list make-bv length-set-code)))
+                    (res (list make-bv)))
            (if (< i (bytevector-length bv))
              (loop (+ i 1)
                    (cons* `(BYTEVECTOR-U8-SET! (R ,r1) (R ,r2) (R ,r3))
@@ -253,7 +250,7 @@
                  (,ope (R ,r1)
                        (R ,r2)
                        (R ,r3))))
-            ((FX+ FX- FX<?)
+            ((FX+ FX- FX<? FX=? FXREMAINDER)
              `(,@args
                (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
                (,ope (R ,r1)
@@ -263,6 +260,7 @@
               `(,@args
                (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
                (EQ? (R ,r1) (R ,r2) (R ,r1))))
+
             ((MAKE-BYTEVECTOR)
              `(,@args
                (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
@@ -445,10 +443,6 @@
                                      new-local-register
                                      (cons (caddr meta-function) env)
                                      global-ids-box jump-box onif-symbol-hash)))
-           ; (display "FVAR >>")(display free-vars-expand)(newline)
-           ; (display "FORMALS >>")(display formals)(newline)
-           ; (display "FREE VARS")(display free-vars)(newline)
-            ;(display "RRR")(display another-register)(newline)(newline)
          (append (list `(DEFUN ,(%make-symbol "FUN" function-id))
                        '(CLOSURE-ENV (R 0) (R 1))
                        `(COMMENT ,(list 'formals (onif-idebug-icode->code formals))))
