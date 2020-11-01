@@ -3,7 +3,6 @@
 (include "./onif-misc.scm");
 (include "./lib/thread-syntax.scm")
 (include "./onif-idebug.scm")
-(include "./lib/rules.scm")
 
 ;TODO:fix import expression
 
@@ -26,10 +25,10 @@
                  (scheme hash)
                  (onif scm env)
                  (onif symbol)))
-     (else
-         (syntax-error "This scheme imprementation is not supported.")))
+     (else (syntax-error "This scheme imprementation is not supported.")))
 
    (export onif-expand
+           onif-expand/expand
            onif-expand-environment
            onif-expand/remove-outer-begin
            onif-expand/separate-namespaces
@@ -81,7 +80,7 @@
                expand-environment)
        (let ((symbol-hash
                (%expand-environment-ref
-                 'syntax-symbol-hash
+                 'original-syntax-symbol-hash
                  expand-environment)))
          (hash-table-ref symbol-hash symbol)))
 
@@ -160,23 +159,11 @@
          (let ((operator-kind (car operator)))
            (case operator-kind
               ((built-in-lambda);LAMBDA
-               (%list-expand-lambda
-                 scm-code
-                 global
-                 stack
-                 expand-environment))
+               (%list-expand-lambda scm-code global stack expand-environment))
               ((built-in-if)
-               (%list-expand-if
-                 scm-code
-                 global
-                 stack
-                 expand-environment))
+               (%list-expand-if scm-code global stack expand-environment))
               ((built-in-define)
-               (%list-expand-define
-                 scm-code
-                 global
-                 stack
-                 expand-environment))
+               (%list-expand-define scm-code global stack expand-environment))
               ((built-in-quote)
                   (list (cadr (%expand-environment-syntax-symbol-hash-ref
                               'quote
@@ -204,6 +191,9 @@
                  global
                  stack
                  expand-environment))
+              ((define-syntax)
+
+               )
               ((built-in-begin)
                (%list-expand-begin
                  scm-code
@@ -220,14 +210,16 @@
                         expand-environment))
                   scm-code)))))
 
-     (define (onif-expand scm-code global stack expand-environment)
+     (define (onif-expand/expand scm-code global stack expand-environment)
         "global is scheme hash."
          (cond
            ((and (pair? scm-code) (symbol? (car scm-code)))
             (let ((operator (%lookup-environment (car scm-code) global stack)))
                (%list-expand operator scm-code global stack expand-environment)))
-           ((and (pair? scm-code) (list? (car scm-code))))
+           ((and (pair? scm-code) (list? (car scm-code))) (error "TBW!"))
            (else scm-code)))
+
+     (define onif-expand onif-expand/expand)
 
      (define (onif-expand/remove-outer-begin scm-code global)
        (let remove-begin ((code scm-code))
@@ -286,12 +278,27 @@
      (define (onif-expand/core-library-name? lib-name)
        (equal? lib-name '(onif-lib core)))
 
+     (define (%import-rename env renames)
+       (let ((res (hash-table-copy env #t)))
+         (let loop ((renames renames))
+           (unless (null? renames)
+             (let* ((key (caar renames))
+                    (new-key (cadar renames))
+                    (val (hash-table-ref env key)))
+               (hash-table-delete! res key)
+               (hash-table-set! res new-key val))))
+         res))
+
      (define (onif-expand/make-environment lib-names)
        "Make environment from onif libraries such as (onif core) included lib-names"
        (fold (lambda (lib-name env)
                (cond
                   ((onif-expand/core-library-name? lib-name)
                      (hash-table-merge! env (onif-scm-env-tiny-core)))
+                  ((and (eq? (car lib-name) 'rename)
+                        (onif-expand/core-library-name? (cadr lib-name)))
+                     (hash-table-merge! env (%import-rename (onif-scm-env-tiny-core)
+                                                           (cddr lib-name))))
                   (else env)))
               (make-hash-table eq?)
               lib-names))

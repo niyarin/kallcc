@@ -2,9 +2,12 @@
 (include "./onif-expand.scm")
 (include "./lib/thread-syntax.scm")
 
+(include "./onif-idebug.scm")
+
 (import (scheme base) (scheme write) (scheme read)
         (scheme file) (only (scheme process-context) command-line)
         (niyarin thread-syntax)
+        (onif idebug)
         (onif phases) (onif expand))
 
 (define (read-all input-port)
@@ -22,8 +25,10 @@
         (let* ((code (read-all input-port))
                (cps-code (-> code
                             (onif-phases/first-stage (onif-expand-environment))
-                            (onif-phases/cps-conv))))
-         (display cps-code)))))
+                            ;(onif-phases/cps-conv)
+                            )))
+         (onif-idebug/debug-display cps-code)
+         ))))
 
 (define (onif-main)
   (let ((cmd (command-line)))
