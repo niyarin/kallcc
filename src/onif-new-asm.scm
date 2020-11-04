@@ -216,6 +216,7 @@
               (jsymbol (string->symbol
                          (string-append
                            "if" (number->string (car jump-box))))))
+          (set-car! jump-box (+ (car jump-box) 1))
           (append test
                   `((IFNOT (R ,register-offset) ,jsymbol))
                   false
@@ -368,15 +369,18 @@
                     free-vars)))
 
    (define (%gen-free-vars-expand free-vars tmp-register register-map stack-for-debug)
-      (let loop ((ls free-vars)
+      ;tmp-register
+      (let loop ((ls free-vars);((<onif-symbol> <integer> <integer>) ...)
                  (current-stack-cell 0)
                  (stk stack-for-debug)
                  (rev-res '()))
         (cond
           ((null? ls) (cons* '(SET! (R 0) (R 1))
-                             `(CAR (R 0) (R ,tmp-register) )
-                             (if (not (null? stk)) `(COMMENT ,(list 'STACK-NOT-EMP
-                                                                    (onif-idebug-icode->code stk))) `(COMMENT ""))
+                             `(CAR (R 0) (R ,tmp-register))
+                             (if (not (null? stk))
+                               `(COMMENT ,(list 'STACK-NOT-EMP
+                                               (onif-idebug-icode->code stk)))
+                               `(COMMENT ""))
                              `(COMMENT STACK-CELL ,(onif-idebug-icode->code (car stack-for-debug)))
                              (reverse rev-res)))
           ((not (eq? (cadar ls) current-stack-cell))
