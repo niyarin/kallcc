@@ -1,7 +1,15 @@
 (define-library (scmspec core)
    (import (scheme base))
-   (export scmspec/lcheck)
+   (export scmspec/lcheck scmspec/pair scmspec/any?)
    (begin
+     (define (scmspec/pair car-spec cdr-spec)
+       (lambda (x)
+         (and (pair? x)
+              (car-spec (car x))
+              (cdr-spec (cdr x)))))
+
+     (define (scmspec/any? x) #t)
+
      (define-syntax %apply-spec
        (syntax-rules ()
           ((%apply-spec input spec spec-mode)

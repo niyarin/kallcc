@@ -2,30 +2,20 @@
 (include "./onif-scm-env.scm");
 (include "./onif-misc.scm");
 (include "./lib/thread-syntax.scm")
+(include "./lib/scmspec.scm")
 (include "./onif-idebug.scm")
 
 ;TODO:fix import expression
 
 (define-library (onif expand)
-   (cond-expand
-     ((library (srfi 125))
-         (import (scheme base)
-                 (scheme write);DEBUG
-                 (scheme cxr)
-                 (srfi 125)
-                 (srfi 1)
-                 (niyarin thread-syntax)
-                 (onif idebug);
-                 (onif scm env)
-                 (onif misc)
-                 (onif symbol)))
-     ((library (scheme hash))
-         (import (scheme base)
-                 (scheme list)
-                 (scheme hash)
-                 (onif scm env)
-                 (onif symbol)))
-     (else (syntax-error "This scheme imprementation is not supported.")))
+   (import (scheme base) (scheme cxr) (scheme list)
+           (srfi 125)
+           (onif scm env) (onif misc)(onif symbol)
+           (niyarin thread-syntax)
+           (scmspec core)
+           (onif idebug);
+           (scheme write);DEBUG
+           )
 
    (export onif-expand
            onif-expand/expand
@@ -156,59 +146,60 @@
 
      (define (%list-expand operator scm-code global stack expand-environment)
         "operator is pair. example. (built-in-lambda . ONIF-SYMBOL)"
-         (let ((operator-kind (car operator)))
-           (case operator-kind
-              ((built-in-lambda);LAMBDA
-               (%list-expand-lambda scm-code global stack expand-environment))
-              ((built-in-if)
-               (%list-expand-if scm-code global stack expand-environment))
-              ((built-in-define)
-               (%list-expand-define scm-code global stack expand-environment))
-              ((built-in-quote)
-                  (list (cadr (%expand-environment-syntax-symbol-hash-ref
-                              'quote
-                              expand-environment))
-                        (cadr scm-code)))
-              ((built-in-car built-in-cdr built-in-cons built-in-eq?
-                built-in-fx+ built-in-fx- built-in-fx* built-in-fx=?
-                built-in-fxremainder
-                built-in-fx<?  built-in-make-bytevector
-                built-in-bytevector-u8-ref built-in-bytevector-u8-set!
-                built-in-bytevector-length)
-               (cons
-                 (cadr operator)
-                 (map
-                    (lambda (expression)
-                      (onif-expand
-                        expression
-                        global
-                        stack
-                        expand-environment))
-                     (cdr scm-code))))
-              ((built-in-define-library)
-               (%list-expand-define-library
-                 scm-code
-                 global
-                 stack
-                 expand-environment))
-              ((define-syntax)
+        (scmspec/lcheck ((input ((operator (scmspec/pair symbol? scmspec/any?)))))
+            (let ((operator-kind (car operator)))
+              (case operator-kind
+                 ((built-in-lambda);LAMBDA
+                  (%list-expand-lambda scm-code global stack expand-environment))
+                 ((built-in-if)
+                  (%list-expand-if scm-code global stack expand-environment))
+                 ((built-in-define)
+                  (%list-expand-define scm-code global stack expand-environment))
+                 ((built-in-quote)
+                     (list (cadr (%expand-environment-syntax-symbol-hash-ref
+                                 'quote
+                                 expand-environment))
+                           (cadr scm-code)))
+                 ((built-in-car built-in-cdr built-in-cons built-in-eq?
+                   built-in-fx+ built-in-fx- built-in-fx* built-in-fx=?
+                   built-in-fxremainder
+                   built-in-fx<?  built-in-make-bytevector
+                   built-in-bytevector-u8-ref built-in-bytevector-u8-set!
+                   built-in-bytevector-length)
+                  (cons
+                    (cadr operator)
+                    (map
+                       (lambda (expression)
+                         (onif-expand
+                           expression
+                           global
+                           stack
+                           expand-environment))
+                        (cdr scm-code))))
+                 ((built-in-define-library)
+                  (%list-expand-define-library
+                    scm-code
+                    global
+                    stack
+                    expand-environment))
+                 ((define-syntax)
 
-               )
-              ((built-in-begin)
-               (%list-expand-begin
-                 scm-code
-                 global
-                 stack
-                 expand-environment))
-              (else ;FUNC RUN
-                  (map
-                    (lambda (expression)
-                      (onif-expand
-                        expression
-                        global
-                        stack
-                        expand-environment))
-                  scm-code)))))
+                  )
+                 ((built-in-begin)
+                  (%list-expand-begin
+                    scm-code
+                    global
+                    stack
+                    expand-environment))
+                 (else ;FUNC RUN
+                     (map
+                       (lambda (expression)
+                         (onif-expand
+                           expression
+                           global
+                           stack
+                           expand-environment))
+                     scm-code))))))
 
      (define (onif-expand/expand scm-code global stack expand-environment)
         "global is scheme hash."
