@@ -12,13 +12,10 @@ This phase rules.
 ;TODO:next-phase (lambda (x) x) => x
 
 (define-library (onif cps)
-   (import (scheme base)
-           (scheme cxr)
+   (import (scheme base) (scheme cxr) (scheme list)
+           (onif misc) (onif idebug) (onif symbol)
            (scheme write);
-           (onif misc)
-           (onif idebug)
-           (srfi 1);SCHEME LIST
-           (onif symbol))
+           )
    (export onif-cps-conv)
 
    (begin
@@ -42,14 +39,14 @@ This phase rules.
           (else #f)))
 
       (define (%onif-not-have-continuation? expression onif-symbol-hash)
+         "If expression is primitive or quote-expression or lambda-operator,
+          this function returning (list expression) ,otherwise #f."
          (cond
-           ((not (list? expression));ATOM(AND NOT NULL)
-               (list expression))
-           ((null? expression);NULL
-               (list '()))
+           ((not (list? expression)) (list expression))
+           ((null? expression) (list '()))
            ((onif-misc/quote-operator? (car expression) onif-symbol-hash)
             (list expression))
-           ((%lambda-operator? (car expression) onif-symbol-hash);LAMBDA
+           ((%lambda-operator? (car expression) onif-symbol-hash)
             (let ((cps-symbol (onif-symbol)))
               (list
                  (list
@@ -57,107 +54,106 @@ This phase rules.
                    (cons cps-symbol (cadr expression))
                   (%cps-conv
                     (car (cddr expression))
-                    `((,cps-symbol #f))
+                    (list (%conv-stack-cell cps-symbol #f))
                     onif-symbol-hash
                     )))))
-           (else
-             #f)))
+           (else #f)))
+
+     (define-record-type <conv-stack-cell>
+         (%conv-stack-cell cont-symbol expression)
+         %conv-stack-cell?
+         (cont-symbol %conv-stack-cell-csymbol %conv-stack-cell-set-csymbol!)
+         (expression %conv-stack-cell-expression %conv-stack-cell-set-expression!))
 
       (define (%cps-conv-begin scm-code stack onif-symbol-hash)
         (%cps-conv-frun scm-code stack onif-symbol-hash #t))
 
-      (define (%stack-symbol-update! stack symbol)
-        (let ((target (car stack)))
-         (set-car! (car stack) symbol)
-         (set-cdr! (car stack)
-            (map (lambda (x)
-                   (if (eq? x target)
-                     symbol
-                     x))
-                 (cdar stack)))))
-
       (define (%begin-last-expression scm-code stack onif-symbol-hash)
-        (let ((res-val (last scm-code))
-              (begin-cont-symbol (caar stack)))
+        (let ((res-val (last scm-code));;begin式の最後の式
+              (begin-cont-symbol (%conv-stack-cell-csymbol (car stack)))
+              (next-expressions (%conv-stack-cell-expression (car stack))))
             (cond
-              ((not (cadar stack)) res-val)
+              ((not next-expressions) res-val)
               (else
                 (map! (lambda (x)
                         (if (eq? x begin-cont-symbol)
                           res-val
                           x))
-                      (cadar stack))))))
+                      next-expressions)
+                (%cps-conv next-expressions (cdr stack) onif-symbol-hash)))))
 
       (define (%cps-conv-frun scm-code stack onif-symbol-hash . beg-flag)
+         "この中では、関数適用だけではなく、begin式の展開にも使う。そのときはbeg-flagが立っている"
          (let* ((res-top-cell (list #f '()))
                 (res-cell res-top-cell)
                 (beg-flag (if (null? beg-flag) #f (car beg-flag))))
              (let loop ((code scm-code))
                  (cond
                    ((and (null? code) beg-flag (last-pair scm-code))
+                      ;begin式の返り値のための処理
                       (%begin-last-expression scm-code stack onif-symbol-hash))
-                   ((null? code)
+                   ((null? code);;全引数見た。
                     (cons* (cadr res-top-cell)
-                           (if (cadar stack)
+                           (if (%conv-stack-cell-expression (car stack))
                                `(,(onif-misc/onif-symbol-hash-ref
                                        onif-symbol-hash 'lambda)
-                                    (,(caar stack))
-                                    ,(%cps-conv (cadar stack)
+                                    (,(%conv-stack-cell-csymbol (car stack)))
+                                    ,(%cps-conv (%conv-stack-cell-expression (car stack))
                                                 (cdr stack) onif-symbol-hash))
-                                (caar stack))
+                                (%conv-stack-cell-csymbol (car stack)))
                            (cddr res-top-cell)))
                    ((%onif-not-have-continuation? (car code) onif-symbol-hash)
                     => (lambda (cont-val)
                           (set-cdr! res-cell (cons (car cont-val) '()))
                           (set! res-cell (cdr res-cell))
                           (loop (cdr code))))
-                   (else
+                   (else;;;継続がある
                      (let ((new-sym (onif-symbol)))
                        (set-cdr! res-cell (cons new-sym (cdr code)))
-                       (%cps-conv
-                         (car code)
-                         (cons
-                           (list new-sym (cdr res-top-cell))
-                           stack)
-                         onif-symbol-hash)))))))
+                       (%cps-conv (car code)
+                                  (cons
+                                    (%conv-stack-cell new-sym (cdr res-top-cell))
+                                    stack)
+                                  onif-symbol-hash)))))))
 
       (define (%cps-conv-if scm-code stack onif-symbol-hash)
          (let ((test-const-exp
-                 (%onif-not-have-continuation? (cadr scm-code) onif-symbol-hash)))
+                 (%onif-not-have-continuation? (cadr scm-code) onif-symbol-hash))
+               (if-symbol (car scm-code))
+               (true-exp (list-ref scm-code 2))
+               (false-exp (list-ref scm-code 3)))
            (if test-const-exp
              (list (car scm-code)
                    (car test-const-exp)
-                   (%cps-conv (list-ref scm-code 2) stack onif-symbol-hash)
-                   (%cps-conv (list-ref scm-code 3) stack onif-symbol-hash))
+                   (%cps-conv true-exp stack onif-symbol-hash)
+                   (%cps-conv false-exp stack onif-symbol-hash))
              (let ((new-sym (onif-symbol)))
                  (%cps-conv
                   (cadr scm-code)
-                  (cons
-                    (list new-sym
-                          (list (car scm-code)
-                                new-sym
-                                (list-ref scm-code 2)
-                                (list-ref scm-code 3)))
+                  (cons (%conv-stack-cell new-sym
+                                         `(,if-symbol
+                                           ,new-sym ,true-exp ,false-exp))
+
                     stack)
                   onif-symbol-hash)))))
 
       (define (%cps-conv scm-code stack onif-symbol-hash)
-        (let ((const-val (%onif-not-have-continuation?
-                           scm-code
-                           onif-symbol-hash)))
+        (let ((const-val
+                (%onif-not-have-continuation? scm-code onif-symbol-hash)))
            (cond
               ((and (not (null? stack))
-                    (not (cadar stack))
+                    (not (%conv-stack-cell-expression (car stack)))
                     const-val) =>
                (lambda (box-const-val)
-                 (list (caar stack) (car box-const-val))))
+                 (list (%conv-stack-cell-csymbol (car stack))
+                       (car box-const-val))))
               (const-val => car)
               ((%if-operator?  (car scm-code) onif-symbol-hash)
                   (%cps-conv-if scm-code stack onif-symbol-hash))
               ((onif-misc/begin-operator? (car scm-code) onif-symbol-hash)
                   (%cps-conv-begin scm-code stack onif-symbol-hash))
-              (else
-                  (%cps-conv-frun scm-code stack onif-symbol-hash)))))
+              (else (%cps-conv-frun scm-code stack onif-symbol-hash)))))
 
       (define (onif-cps-conv scm-code onif-symbol-hash)
-        (%cps-conv scm-code '((() #f)) onif-symbol-hash))))
+        (%cps-conv scm-code (list (%conv-stack-cell '() #f))
+                   onif-symbol-hash))))
