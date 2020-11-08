@@ -8,17 +8,18 @@
 (include "./onif-flat-lambda.scm")
 (include "./onif-name-ids.scm")
 (include "./onif-alpha-conv.scm")
-(include "./onif-like-asm.scm")
 (include "./onif-new-asm.scm")
 (include "./onif-opt-names.scm")
+(include "./onif-my-specs.scm")
 
 (define-library (onif phases)
    (import (scheme base) (scheme list) (scheme cxr) (srfi 69);scheme hash
            (scheme write);
            (only (niyarin thread-syntax) ->> ->)
+           (scmspec core) (onif my-specs)
            (onif idebug) (onif symbol) (onif scm env)
            (onif meta-lambda) (onif name-ids) (onif alpha conv) (onif flat-lambda) (onif misc)
-           (onif like-asm) (onif new-asm) (onif expand) (onif cps) (onif opt names))
+           (onif new-asm) (onif expand) (onif cps) (onif opt names))
    (export onif-phases/pre-expand onif-phases/expand-namespaces
            onif-phases/solve-imported-name onif-phases/solve-imported-symbol
            onif-phases/alpha-conv! onif-phases/first-stage
@@ -28,15 +29,20 @@
    (begin
      (define (onif-phases/pre-expand code global)
        "Removes global begin and splites source code based on namespace."
-       (let* ((expression-begin-removed
-                (append-map (lambda (expression)
+       (scmspec/lcheck
+         ((input (code list?)
+                 (global hash-table?))
+          (output
+              (scmspec/list-of
+                (scmspec/pair my-specs/libname?
+                              (scmspec/list-of my-specs/scheme-expression?)))))
+          (let* ((expression-begin-removed
+                   (append-map
+                     (lambda (expression)
                        (onif-expand/remove-outer-begin expression global))
-                       code))
-              (namespaces
-                 (onif-expand/separate-namespaces
-                   expression-begin-removed
-                   global)))
-           namespaces))
+                     code)))
+                  ;(() code) (<libname> code) ... )
+            (onif-expand/separate-namespaces expression-begin-removed global))))
 
      (define (%sort-libraries namespaces global)
        ;;ここのglobalはほんとは正しくない(importが(scheme base)のimportじゃない場合等でこの手続きは正しく動作しない)
@@ -66,42 +72,52 @@
                           namespace))))))
 
       (define (%expand-loop expressions global expand-environment other-namespaces)
-        ;TODO: import macros from other namespaces
-        (let ((res (onif-misc/ft-pair)))
-           (let loop ((expressions expressions)
-                      (global global)
-                      (expand-environment expand-environment))
-             (cond
-               ((null? expressions)
-                (cons expand-environment
-                      (onif-misc/ft-pair-res res)))
-               ((onif-expand/import-expression?  (car expressions) global)
-                (let* ((new-global (onif-expand/make-environment (cdar expressions)))
-                       (new-expand-environment
-                         `((syntax-symbol-hash ,new-global)
-                           (original-syntax-symbol-hash ,(onif-scm-env-tiny-core))
-                           (import-libraries ,(remove onif-expand/core-library-name?  (cdar expressions))))))
-                   (loop (cdr expressions)
-                         new-global
-                         new-expand-environment)))
-               ((onif-expand/export-expression? (car expressions) global)
-                   (loop (cdr expressions);TODO: Support rename
-                         global
-                         (cons `(export-symbols ,(cdar expressions))
-                               expand-environment)))
-               (else
-                 (onif-misc/ft-pair-push!
-                   res
-                   (onif-expand (car expressions) global '() expand-environment))
-                 (loop (cdr expressions) global expand-environment))))))
+        "Return pair (expand-environment . expressions)."
+        (scmspec/lcheck ((input (expressions (scmspec/pair
+                                                (scmspec/or my-specs/import-expression?
+                                                            my-specs/scheme-expression?)
+                                                (scmspec/list-of (scmspec/not my-specs/import-expression?))))
+                                (global hash-table?)))
+           ;TODO: import macros from other namespaces
+           (let ((res (onif-misc/ft-pair)))
+              (let loop ((expressions expressions)
+                         (global global)
+                         (expand-environment expand-environment))
+                (cond
+                  ((null? expressions)
+                   (cons expand-environment
+                         (onif-misc/ft-pair-res res)))
+                  ((onif-expand/import-expression?  (car expressions) global)
+                   (let* ((new-global (onif-expand/make-environment
+                                        (cdar expressions)))
+                          (new-expand-environment
+                            `((syntax-symbol-hash ,new-global)
+                              (original-syntax-symbol-hash ,(onif-scm-env-tiny-core))
+                              (import-libraries
+                                ,(remove onif-expand/core-library-name?
+                                         (cdar expressions))))))
+                      (loop (cdr expressions) new-global new-expand-environment)))
+                  ((onif-expand/export-expression? (car expressions) global)
+                      (loop (cdr expressions);TODO: Support rename
+                            global
+                            (cons `(export-symbols ,(cdar expressions))
+                                  expand-environment)))
+                  (else
+                    (onif-misc/ft-pair-push!
+                      res
+                      (onif-expand (car expressions) global '() expand-environment))
+                    (loop (cdr expressions) global expand-environment)))))))
 
-      (define (onif-phases/expand-namespaces this-expressions namespaces expand-environment)
+      (define (onif-phases/expand-namespaces this-expressions
+                                             namespaces expand-environment)
         (->> (append namespaces (list (cons '() this-expressions)))
              (fold (lambda (namespace res)
+                     ;;各ライブラリの中身はpre-expandされていないので、ここで適用
                      (let* ((pre-expanded-expressions
+                                 ;(() code) (<libname> code) ... )
                                  (onif-phases/pre-expand (cdr namespace)
                                                          (cadr (assq 'syntax-symbol-hash
-                                                         expand-environment))))
+                                                                     expand-environment))))
                             (target-expressions (cadar pre-expanded-expressions)))
                         (cons (cons (car namespace)
                                     (%expand-loop target-expressions
@@ -118,12 +134,14 @@
                                (->> (onif-expand/defined-symbols (cddr namespace-expression) symbol-hash)
                                     (map (lambda (sym)
                                            (list sym (onif-symbol sym))))))))))
-          (for-each (lambda (expressions renamed-targets)
+          (for-each (lambda (expressions ;namespace
+                              renamed-targets)
                       (begin
-                           (set-car! (cdr expressions)
-                                     (cons `(export-rename ,renamed-targets)
-                                           (cadr expressions)))
-                         (->> (cddr expressions)
+                         ;;add export-rename info to namespace.
+                         (set-car! (cdr expressions)
+                                   (cons `(export-rename ,renamed-targets)
+                                         (cadr expressions)))
+                         (->> (cddr expressions);expressions
                               (for-each
                                 (lambda (expression)
                                    (onif-alpha/conv!
@@ -271,47 +289,6 @@
                                  (+ (length lambdas) offset)))))))
              0 namespaces)
           (onif-misc/ft-pair-res res)))
-
-      (define (%asm-funs namespaces global-ids-box jump-box)
-        (->> namespaces
-             (map (lambda (namespace)
-                    (->> (%namespace-assq 'id-lambdas namespace)
-                         ((lambda (id-lambdas)
-                            (onif-like-asm/convert-functions
-                              id-lambdas
-                              0
-                              global-ids-box
-                              (%namespace-assq 'syntax-symbol-hash namespace)
-                              jump-box))))))))
-
-      (define (%asm-body namespaces global-ids-box jump-box)
-        (->> namespaces
-              (map (lambda (namespace)
-                     (->> (reverse (%namespace-assq 'body namespace))
-                          (map (lambda (body)
-                                 (cons
-                                   '(BODY-START)
-                                   (onif-like-asm/convert
-                                       body
-                                       0
-                                       '()
-                                       global-ids-box
-                                       (%namespace-assq 'syntax-symbol-hash
-                                                        namespace)
-                                       1
-                                       jump-box))))
-                          (apply append))))))
-
-      (define (onif-phase/asm namespaces)
-        (let* ((global-ids-box (onif-like-asm/make-global-ids-box))
-               (jump-box (list 0))
-               (bodies (%asm-body namespaces global-ids-box jump-box))
-               (funs (%asm-funs namespaces global-ids-box jump-box)))
-            (append
-              (concatenate  funs)
-              '((COMMENT "BODY"))
-              (concatenate bodies)
-              '((BODY-START) (HALT)))))
 
       (define (%new-asm-funs namespaces global-ids-box jump-box)
         (->> namespaces

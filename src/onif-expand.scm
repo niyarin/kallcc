@@ -6,7 +6,6 @@
 (include "./onif-idebug.scm")
 
 ;TODO:fix import expression
-
 (define-library (onif expand)
    (import (scheme base) (scheme cxr) (scheme list)
            (srfi 125)
@@ -146,7 +145,7 @@
 
      (define (%list-expand operator scm-code global stack expand-environment)
         "operator is pair. example. (built-in-lambda . ONIF-SYMBOL)"
-        (scmspec/lcheck ((input ((operator (scmspec/pair symbol? scmspec/any?)))))
+        (scmspec/lcheck ((input (operator (scmspec/pair symbol? scmspec/any?))))
             (let ((operator-kind (car operator)))
               (case operator-kind
                  ((built-in-lambda);LAMBDA
@@ -182,9 +181,8 @@
                     global
                     stack
                     expand-environment))
-                 ((define-syntax)
-
-                  )
+                 ((built-in-define-syntax)
+                     (error "TBW"))
                  ((built-in-begin)
                   (%list-expand-begin
                     scm-code
@@ -204,6 +202,7 @@
      (define (onif-expand/expand scm-code global stack expand-environment)
         "global is scheme hash."
          (cond
+           ((symbol? scm-code) (%lookup-environment scm-code global stack))
            ((and (pair? scm-code) (symbol? (car scm-code)))
             (let ((operator (%lookup-environment (car scm-code) global stack)))
                (%list-expand operator scm-code global stack expand-environment)))
