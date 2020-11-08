@@ -28,7 +28,7 @@
                        (define . (built-in-define  ,(onif-symbol 'DEFINE)))
                        (set! . (built-in-set! ,(onif-symbol 'SET!)))
                        (quote . (built-in-quote ,(onif-symbol 'QUOTE)))
-                       (define-syntax . (built-in-set! ,(onif-symbol 'DEFINE-SYNTAX)))
+                       (define-syntax . (built-in-define-syntax ,(onif-symbol 'DEFINE-SYNTAX)))
                        (let-syntax . (built-in-set! ,(onif-symbol 'LET-SYNTAX)))
                        (begin . (built-in-begin ,(onif-symbol 'BEGIN)))
                        (define-library . (built-in-define-library ,(onif-symbol 'DEFINE-LIBRARY-SYNTAX)))
@@ -73,6 +73,4 @@
              eq?)))
 
      (define (onif-scm-env-tiny-core)
-         (alist->hash-table
-           (%scm-env-tiny-core)
-           eq?))))
+         (alist->hash-table (%scm-env-tiny-core) eq?))))

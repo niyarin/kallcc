@@ -26,7 +26,8 @@
            onif-expand/make-environment
            onif-expand/core-library-name?
            onif-expand/make-library-environment
-           onif-expand/defined-symbols)
+           onif-expand/defined-symbols
+           onif-expand/define-syntax-expression?)
 
    (begin
 
@@ -238,23 +239,18 @@
 
      (define (onif-expand/import-expression? expression global)
          (and (pair? expression)
-              (let ((ope (%lookup-environment
-                           (car expression)
-                           global
-                           '())))
-                (and (pair? ope)
-                     (eq? 'built-in-import
-                          (car ope))))))
+              (let ((ope (%lookup-environment (car expression) global '())))
+                (and (pair? ope) (eq? 'built-in-import (car ope))))))
 
       (define (onif-expand/export-expression? expression global)
          (and (pair? expression)
-              (let ((ope (%lookup-environment
-                           (car expression)
-                           global
-                           '())))
-                (and (pair? ope)
-                     (eq? 'built-in-export
-                          (car ope))))))
+              (let ((ope (%lookup-environment (car expression) global '())))
+                (and (pair? ope) (eq? 'built-in-export (car ope))))))
+
+      (define (onif-expand/define-syntax-expression? expression global)
+        (and (pair? expression)
+             (let ((ope (%lookup-environment (car expression) global '())))
+               (and (pair? ope) (eq? 'built-in-define-syntax (car ope))))))
 
      (define (onif-expand-environment)
          `((syntax-symbol-hash
@@ -263,7 +259,6 @@
      (define (onif-expand/make-library-environment)
          `((syntax-symbol-hash
              ,(onif-scm-env/make-env-for-library))))
-
 
      (define (onif-expand/core-library-name? lib-name)
        (equal? lib-name '(onif-lib core)))

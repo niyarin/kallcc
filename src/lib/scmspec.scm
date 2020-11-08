@@ -27,14 +27,12 @@
                       x))))
 
      (define (scmspec/eq object)
-       (lambda (x)
-         (eq? x object)))
+       (lambda (x) (eq? x object)))
 
      (define (scmspec/any? x) #t)
 
      (define (scmspec/not spec)
-       (lambda (x)
-         (not (apply-spec* spec x))))
+       (lambda (x) (not (apply-spec* spec x))))
 
      (define (scmspec/or . specs)
        (lambda (x)
@@ -57,7 +55,7 @@
        (if res
          res
          (begin
-           (unless **state (set! **state (vector 321 input)))
+           (unless **state (set! **state (vector input)))
            #f))))
 
 

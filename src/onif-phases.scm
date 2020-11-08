@@ -108,22 +108,29 @@
                       (onif-expand (car expressions) global '() expand-environment))
                     (loop (cdr expressions) global expand-environment)))))))
 
+      (define (%treat-define-syntax! expressions global)
+        (let loop ((expressions expressions)
+                   (res '()))
+          (cond
+            ((null? expressions) (reverse res))
+            ((onif-expand/define-syntax-expression? (car expressions) global)
+               (loop (cdr expressions) res))
+            (else (loop (cdr expressions)
+                        (cons (car expressions) res))))))
+
       (define (onif-phases/expand-namespaces this-expressions
                                              namespaces expand-environment)
         (->> (append namespaces (list (cons '() this-expressions)))
              (fold (lambda (namespace res)
                      ;;各ライブラリの中身はpre-expandされていないので、ここで適用
-                     (let* ((pre-expanded-expressions
+                     (let* ((global (cadr (assq 'syntax-symbol-hash expand-environment)))
+                            (pre-expanded-expressions
                                  ;(() code) (<libname> code) ... )
-                                 (onif-phases/pre-expand (cdr namespace)
-                                                         (cadr (assq 'syntax-symbol-hash
-                                                                     expand-environment))))
-                            (target-expressions (cadar pre-expanded-expressions)))
+                                 (onif-phases/pre-expand (cdr namespace) global))
+                            (target-expressions* (cadar pre-expanded-expressions))
+                            (target-expressions (%treat-define-syntax! target-expressions* global)))
                         (cons (cons (car namespace)
-                                    (%expand-loop target-expressions
-                                                  (cadr (assq 'syntax-symbol-hash expand-environment))
-                                                  expand-environment
-                                                  res))
+                                    (%expand-loop target-expressions global expand-environment res))
                               res)))
                    '())))
 
