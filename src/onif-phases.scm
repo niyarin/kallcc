@@ -108,16 +108,6 @@
                       (onif-expand (car expressions) global '() expand-environment))
                     (loop (cdr expressions) global expand-environment)))))))
 
-      (define (%treat-define-syntax! expressions global)
-        (let loop ((expressions expressions)
-                   (res '()))
-          (cond
-            ((null? expressions) (reverse res))
-            ((onif-expand/define-syntax-expression? (car expressions) global)
-               (loop (cdr expressions) res))
-            (else (loop (cdr expressions)
-                        (cons (car expressions) res))))))
-
       (define (onif-phases/expand-namespaces this-expressions
                                              namespaces expand-environment)
         (->> (append namespaces (list (cons '() this-expressions)))
@@ -127,8 +117,7 @@
                             (pre-expanded-expressions
                                  ;(() code) (<libname> code) ... )
                                  (onif-phases/pre-expand (cdr namespace) global))
-                            (target-expressions* (cadar pre-expanded-expressions))
-                            (target-expressions (%treat-define-syntax! target-expressions* global)))
+                            (target-expressions (cadar pre-expanded-expressions)))
                         (cons (cons (car namespace)
                                     (%expand-loop target-expressions global expand-environment res))
                               res)))
@@ -338,5 +327,4 @@
                (append
                  funs
                  (concatenate bodies)
-                 '((BODY-START)
-                   (HALT)))))))
+                 '((BODY-START) (HALT)))))))
