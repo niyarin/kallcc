@@ -3,20 +3,19 @@
 (include "./onif-misc.scm");
 (include "./lib/thread-syntax.scm")
 (include "./lib/scmspec.scm")
-(include "./onif-idebug.scm")
 
 ;TODO:fix import expression
 (define-library (onif expand)
    (import (scheme base) (scheme cxr) (scheme list)
            (srfi 125)
-           (onif scm env) (onif misc)(onif symbol)
+           (onif scm env) (onif misc) (onif symbol)
            (niyarin thread-syntax)
            (scmspec core)
-           (onif idebug);
            (scheme write);DEBUG
            )
 
    (export onif-expand
+           onif-expand/make-syntax-object
            onif-expand/expand
            onif-expand-environment
            onif-expand/remove-outer-begin
@@ -35,7 +34,8 @@
 
      (define (%rename-symbol sym))
 
-     (define (%global-lookup symbol global) (if (hash-table-exists? global symbol)
+     (define (%global-lookup symbol global)
+       (if (hash-table-exists? global symbol)
            (hash-table-ref global symbol)
            (list 'undefined symbol)))
 
@@ -161,6 +161,7 @@
                                  expand-environment))
                            (cadr scm-code)))
                  ((built-in-car built-in-cdr built-in-cons built-in-eq?
+                   built-in-vector-set! built-in-make-vector
                    built-in-fx+ built-in-fx- built-in-fx* built-in-fx=?
                    built-in-fxremainder
                    built-in-fx<?  built-in-make-bytevector
@@ -168,28 +169,22 @@
                    built-in-bytevector-length)
                   (cons
                     (cadr operator)
-                    (map
-                       (lambda (expression)
-                         (onif-expand
-                           expression
-                           global
-                           stack
-                           expand-environment))
+                    (map (lambda (expression)
+                            (onif-expand
+                              expression global stack expand-environment))
                         (cdr scm-code))))
                  ((built-in-define-library)
                   (%list-expand-define-library
-                    scm-code
-                    global
-                    stack
-                    expand-environment))
+                    scm-code global stack expand-environment))
                  ((built-in-define-syntax)
-                     (error "TBW"))
+                     (let ((syntax-object
+                             (onif-expand/make-syntax-object
+                               (list-ref scm-code 2)
+                               global)))
+                       (hash-table-set! global (cadr scm-code) syntax-object)))
                  ((built-in-begin)
                   (%list-expand-begin
-                    scm-code
-                    global
-                    stack
-                    expand-environment))
+                    scm-code global stack expand-environment))
                  (else ;FUNC RUN
                      (map
                        (lambda (expression)
@@ -203,7 +198,7 @@
      (define (onif-expand/expand scm-code global stack expand-environment)
         "global is scheme hash."
          (cond
-           ((symbol? scm-code) (%lookup-environment scm-code global stack))
+           ;((symbol? scm-code) (%lookup-environment scm-code global stack))
            ((and (pair? scm-code) (symbol? (car scm-code)))
             (let ((operator (%lookup-environment (car scm-code) global stack)))
                (%list-expand operator scm-code global stack expand-environment)))
@@ -287,6 +282,13 @@
                   (else env)))
               (make-hash-table eq?)
               lib-names))
+
+     (define (onif-expand/make-syntax-object syntax-code symbol-hash)
+       "This code is only supports usage as a rename.
+        eg. (define-syntax define2 define)"
+        (if (symbol? syntax-code)
+          (%global-lookup syntax-code symbol-hash)
+          (error "TBW! syntax")))
 
      (define (onif-expand/defined-symbols expressions symbol-hash)
        (->> expressions
