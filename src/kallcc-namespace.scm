@@ -1,0 +1,10 @@
+(define-library (kallcc namespace)
+  (import (scheme base) (scheme list))
+  (export namespace?)
+  (begin
+    (define (namespace? object)
+      (and (list? object)
+           (list? (car object))
+           (every symbol? (car object))
+           (every (lambda (x) (and (pair? x) (symbol? (car x))))
+                  (cadr object))))))
