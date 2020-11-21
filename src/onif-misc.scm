@@ -24,7 +24,8 @@
            onif-misc/for-each-cell1
            onif-misc/map-indexed
            onif-misc/var?
-           onif-misc/const?)
+           onif-misc/const?
+           onif-misc/namespace-assq)
    (begin
      (define (onif-misc/var? obj)
        (or (symbol? obj)
@@ -60,6 +61,9 @@
      (define onif-misc/quote-operator?
        (onif-misc/make-check-onif-symbol-base-function 'quote))
 
+     (define onif-misc/define-syntax?
+       (onif-misc/make-check-onif-symbol-base-function 'define-syntax))
+
      (define (onif-misc/onif-symbol-hash-ref onif-symbol-hash symbol)
         (cond
           ((hash-table-ref onif-symbol-hash symbol) => cadr)
@@ -70,6 +74,7 @@
          #f
          (case (onif-symbol/ref-symbol operator)
             ((CONS CAR CDR PAIR? SET-CAR! SET-CDR! FX+ FX- FX=? FX<? EQ? FXREMAINDER
+              MAKE-VECTOR VECTOR-SET!
               BYTEVECTOR-U8-REF BYTEVECTOR-U8-SET! MAKE-BYTEVECTOR BYTEVECTOR-LENGTH)
              => (lambda (x) x))
             (else #f))))
@@ -113,4 +118,12 @@
             (onif-misc/ft-pair-res res-cell)
             (begin
               (onif-misc/ft-pair-push! res-cell (f index (car ls)))
-              (loop (cdr ls) (+ index 1)))))))))
+              (loop (cdr ls) (+ index 1)))))))
+
+    (define (onif-misc/namespace-assq  key namespace . default)
+        (cond
+          ((not namespace) (error "Namespace is null"));;default?
+          ((assq key (cadr namespace)) => cadr)
+          ((not (null? default)) (car default))
+          (else (error "Namespace doesn't have key."
+                       key namespace))))))

@@ -3,12 +3,14 @@
 (include "./onif-misc.scm");
 (include "./lib/thread-syntax.scm")
 (include "./lib/scmspec.scm")
+(include "./onif-syntax-rules.scm")
 
 ;TODO:fix import expression
 (define-library (onif expand)
    (import (scheme base) (scheme cxr) (scheme list)
            (srfi 125)
            (onif scm env) (onif misc) (onif symbol)
+           (onif syntax-rules)
            (niyarin thread-syntax)
            (scmspec core)
            (scheme write);DEBUG
@@ -51,8 +53,7 @@
               ((null? stack)
                (%global-lookup symbol global))
               ((%local-cell-lookup symbol (car stack)))
-              (else
-                (loop (cdr stack))))))
+              (else (loop (cdr stack))))))
 
      (define (%expand-environment-ref symbol expand-environment)
        (cond
@@ -179,12 +180,19 @@
                  ((built-in-define-syntax)
                      (let ((syntax-object
                              (onif-expand/make-syntax-object
-                               (list-ref scm-code 2)
-                               global)))
+                               (list-ref scm-code 2) global stack)))
                        (hash-table-set! global (cadr scm-code) syntax-object)))
                  ((built-in-begin)
                   (%list-expand-begin
                     scm-code global stack expand-environment))
+                 ((user-syntax)
+                  (let ((q (onif-syntax-rules/expand (cadr operator) scm-code)))
+                    (display ">>")(display q)(newline))
+                  (onif-expand/expand
+                    (onif-syntax-rules/expand (cadr operator) scm-code)
+                    global
+                    stack
+                    expand-environment))
                  (else ;FUNC RUN
                      (map
                        (lambda (expression)
@@ -202,7 +210,7 @@
            ((and (pair? scm-code) (symbol? (car scm-code)))
             (let ((operator (%lookup-environment (car scm-code) global stack)))
                (%list-expand operator scm-code global stack expand-environment)))
-           ((and (pair? scm-code) (list? (car scm-code))) (error "TBW!"))
+           ((and (pair? scm-code) (list? (car scm-code))) (error "TBW!" scm-code))
            (else scm-code)))
 
      (define onif-expand onif-expand/expand)
@@ -248,12 +256,10 @@
                (and (pair? ope) (eq? 'built-in-define-syntax (car ope))))))
 
      (define (onif-expand-environment)
-         `((syntax-symbol-hash
-             ,(onif-scm-env-tiny-core))))
+        `((syntax-symbol-hash ,(onif-scm-env-tiny-core))))
 
      (define (onif-expand/make-library-environment)
-         `((syntax-symbol-hash
-             ,(onif-scm-env/make-env-for-library))))
+        `((syntax-symbol-hash ,(onif-scm-env/make-env-for-library))))
 
      (define (onif-expand/core-library-name? lib-name)
        (equal? lib-name '(onif-lib core)))
@@ -269,7 +275,16 @@
                (hash-table-set! res new-key val))))
          res))
 
-     (define (onif-expand/make-environment lib-names)
+     (define (%namespace->export-global namespace)
+         (let* ((exports (onif-misc/namespace-assq 'export-symbols namespace '()))
+                (syntax-symbol-hash (onif-misc/namespace-assq 'syntax-symbol-hash namespace));;名前変えたい
+                )
+            (alist->hash-table
+               (->> exports
+                    (map (lambda (symbol) (cons symbol (hash-table-ref syntax-symbol-hash symbol)))))
+               eq?)))
+
+     (define (onif-expand/make-environment lib-names other-namespaces)
        "Make environment from onif libraries such as (onif core) included lib-names"
        (fold (lambda (lib-name env)
                (cond
@@ -279,16 +294,32 @@
                         (onif-expand/core-library-name? (cadr lib-name)))
                      (hash-table-merge! env (%import-rename (onif-scm-env-tiny-core)
                                                            (cddr lib-name))))
+                  ((assoc lib-name other-namespaces)
+                   => (lambda (namespace)
+                        (let ((exported-global (%namespace->export-global namespace)))
+                          (hash-table-merge! env exported-global))))
                   (else env)))
               (make-hash-table eq?)
               lib-names))
 
-     (define (onif-expand/make-syntax-object syntax-code symbol-hash)
+     (define (onif-expand/make-syntax-object syntax global stack)
        "This code is only supports usage as a rename.
         eg. (define-syntax define2 define)"
-        (if (symbol? syntax-code)
-          (%global-lookup syntax-code symbol-hash)
-          (error "TBW! syntax")))
+        (if (symbol? syntax)
+          (%global-lookup syntax global)
+          (let ((ope (%lookup-environment (car syntax) global stack)))
+            (case (car ope)
+               ((built-in-syntax-rules)
+                (let* ((have-ellip (symbol? (cadr syntax)))
+                       (ellipsis (if have-ellip (cadr exntax) '...))
+                      (literals (if have-ellip
+                                  (list-ref syntax 2)
+                                  (cadr syntax)))
+                      (body (if have-ellip (cdddr syntax) (cddr syntax))))
+                  (list 'user-syntax
+                       (onif-syntax-rules/make-syntax-rules
+                           ellipsis literals body))))
+               (else (error "MACRO!"))))))
 
      (define (onif-expand/defined-symbols expressions symbol-hash)
        (->> expressions

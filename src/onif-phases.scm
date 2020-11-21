@@ -85,11 +85,10 @@
                          (expand-environment expand-environment))
                 (cond
                   ((null? expressions)
-                   (cons expand-environment
-                         (onif-misc/ft-pair-res res)))
+                   (cons expand-environment (onif-misc/ft-pair-res res)))
                   ((onif-expand/import-expression?  (car expressions) global)
-                   (let* ((new-global (onif-expand/make-environment
-                                        (cdar expressions)))
+                   (let* ((new-global
+                            (onif-expand/make-environment (cdar expressions) other-namespaces))
                           (new-expand-environment
                             `((syntax-symbol-hash ,new-global)
                               (original-syntax-symbol-hash ,(onif-scm-env-tiny-core))
@@ -148,13 +147,7 @@
                expanded-namespaces
                defined-symbols)))
 
-      (define (%namespace-assq key namespace . default)
-        (cond
-          ((not namespace) (error "Namespace is null"))
-          ((assq key (cadr namespace)) => cadr)
-          ((not (null? default)) (car default))
-          (else (error "Namespace doesn't have key."
-                       key namespace))))
+      (define %namespace-assq onif-misc/namespace-assq)
 
       (define (onif-phases/solve-imported-symbol namespaces)
         "Return alist for import symbols. ((symbol rename-onif-symbol) ...)"
