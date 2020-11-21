@@ -104,28 +104,19 @@
                                args-list))
               (bodies
                 (map (lambda (expression)
-                       (onif-expand
-                         expression
-                         global
-                         (cons stack-cell stack)
-                         expand-environment))
+                       (onif-expand expression global (cons stack-cell stack)
+                                    expand-environment))
                      (cddr scm-code)))
-             (body
-               (if (null? (cdr bodies))
-                 (car bodies)
-                 (cons
-                   (cadr
-                      (%expand-environment-syntax-symbol-hash-ref
-                        'begin
-                        expand-environment))
-                   bodies))))
-          (list
-            (cadr
-               (%expand-environment-syntax-symbol-hash-ref
-                     'lambda
-                     expand-environment))
-            (cadr scm-code)
-            body)))
+              (body
+                (if (null? (cdr bodies))
+                  (car bodies)
+                  (cons (cadr (%expand-environment-syntax-symbol-hash-ref
+                                 'begin expand-environment))
+                        bodies))))
+          (list (cadr (%expand-environment-syntax-symbol-hash-ref
+                     'lambda expand-environment))
+                (cadr scm-code)
+                body)))
 
      (define (%list-expand-define-library
                scm-code global stack expand-environment)
