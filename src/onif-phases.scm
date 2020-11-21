@@ -11,6 +11,7 @@
 (include "./onif-new-asm.scm")
 (include "./onif-opt-names.scm")
 (include "./onif-my-specs.scm")
+(include "./kallcc-namespace.scm")
 
 (define-library (onif phases)
    (import (scheme base) (scheme list) (scheme cxr) (srfi 69);scheme hash
@@ -19,7 +20,8 @@
            (scmspec core) (onif my-specs)
            (onif idebug) (onif symbol) (onif scm env)
            (onif meta-lambda) (onif name-ids) (onif alpha conv) (onif flat-lambda) (onif misc)
-           (onif new-asm) (onif expand) (onif cps) (onif opt names))
+           (onif new-asm) (onif expand) (onif cps) (onif opt names)
+           (prefix (kallcc namespace) knamespace/))
    (export onif-phases/pre-expand onif-phases/expand-namespaces
            onif-phases/solve-imported-name onif-phases/solve-imported-symbol
            onif-phases/alpha-conv! onif-phases/first-stage
@@ -32,17 +34,13 @@
        (scmspec/lcheck
          ((input (code list?)
                  (global hash-table?))
-          (output
-              (scmspec/list-of
-                (scmspec/pair my-specs/libname?
-                              (scmspec/list-of my-specs/scheme-expression?)))))
+          (output (scmspec/list-of knamespace/namespace?)))
           (let* ((expression-begin-removed
                    (append-map
                      (lambda (expression)
                        (onif-expand/remove-outer-begin expression global))
                      code)))
-                  ;(() code) (<libname> code) ... )
-            (onif-expand/separate-namespaces expression-begin-removed global))))
+             (onif-expand/separate-namespaces expression-begin-removed global))))
 
      (define (%sort-libraries namespaces global)
        ;;ここのglobalはほんとは正しくない(importが(scheme base)のimportじゃない場合等でこの手続きは正しく動作しない)
@@ -109,16 +107,18 @@
 
       (define (onif-phases/expand-namespaces this-expressions
                                              namespaces expand-environment)
-        (->> (append namespaces (list (cons '() this-expressions)))
+        (->> (append namespaces (list `(() ((body ,this-expressions)))))
              (fold (lambda (namespace res)
                      ;;各ライブラリの中身はpre-expandされていないので、ここで適用
                      (let* ((global (cadr (assq 'syntax-symbol-hash expand-environment)))
                             (pre-expanded-expressions
                                  ;(() code) (<libname> code) ... )
-                                 (onif-phases/pre-expand (cdr namespace) global))
-                            (target-expressions (cadar pre-expanded-expressions)))
+                                 (onif-phases/pre-expand (onif-misc/namespace-assq 'body namespace)
+                                                         global))
+                            (target-namespace (car pre-expanded-expressions)))
                         (cons (cons (car namespace)
-                                    (%expand-loop target-expressions global expand-environment res))
+                                    (%expand-loop (onif-misc/namespace-assq 'body target-namespace)
+                                                  global expand-environment res))
                               res)))
                    '())))
 
@@ -151,27 +151,25 @@
 
       (define (onif-phases/solve-imported-symbol namespaces)
         "Return alist for import symbols. ((symbol rename-onif-symbol) ...)"
-        (->> namespaces
-             (map (lambda (namespace)
-                    (let* ((import-libnames
-                             (%namespace-assq 'import-libraries namespace))
-                           (import-symbols
-                             (->> import-libnames
-                                  (map (lambda (libname)
-                                          (->> (assoc libname namespaces)
-                                               (%namespace-assq
-                                                 'export-rename))))
-                                  concatenate)))
-                       import-symbols)))))
+         (map (lambda (namespace)
+                (append-map
+                  (lambda (libname)
+                        (knamespace/nassq 'export-rename
+                                          (assoc libname namespaces)))
+                  (knamespace/nassq 'import-libraries namespace)))
+              namespaces))
 
       (define (onif-phases/first-stage code expand-environment)
+         ;;expand-enviuronment:((syntax-symbol-hash ,(onif-scm-env-tiny-core)))
          (let* ((global
                   (cadr (assq 'syntax-symbol-hash expand-environment)))
-                (namespaces
+                (namespaces ;knamespace
                   (onif-phases/pre-expand code (onif-scm-env-tiny-core)))
                 (expanded-namespaces
-                  (onif-phases/expand-namespaces (cadar namespaces)
-                                                 (cdr namespaces)
+                  (onif-phases/expand-namespaces (onif-misc/namespace-assq
+                                                   'body
+                                                   (car namespaces))
+                                                 (cdr namespaces);ライブラリの名前空間
                                                  expand-environment))
                 (alpha-converted-code
                   (begin (onif-phases/alpha-conv! expanded-namespaces global)

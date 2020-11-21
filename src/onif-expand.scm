@@ -234,13 +234,13 @@
                           (lambda (x)
                             (and (pair? x)
                                  (eq? 'built-in-define-library
-                                      (car (%lookup-environment
-                                             (car x)
-                                             global
-                                             '())))))
+                                      (car (%lookup-environment (car x) global '())))))
                           expressions)))
-            (cons (list '() this-expressions)
-                  (map cdr namespaces))))
+            (cons `(() ((body ,this-expressions)))
+                  (map (lambda (define-library-code)
+                         `(,(cadr define-library-code)
+                           ((body ,(cddr define-library-code)))))
+                       namespaces))))
 
      (define (onif-expand/import-expression? expression global)
          (and (pair? expression)
@@ -283,7 +283,12 @@
                 )
             (alist->hash-table
                (->> exports
-                    (map (lambda (symbol) (cons symbol (hash-table-ref syntax-symbol-hash symbol)))))
+                    (filter (lambda (symbol)
+                              (hash-table-contains? syntax-symbol-hash
+                                                    symbol)))
+                    (map (lambda (symbol)
+                           (cons symbol
+                                 (hash-table-ref syntax-symbol-hash symbol)))))
                eq?)))
 
      (define (onif-expand/make-environment lib-names other-namespaces)
