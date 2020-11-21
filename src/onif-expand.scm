@@ -43,15 +43,13 @@
 
      (define (%local-cell-lookup symbol local-cell)
        (cond
-         ((assv local-cell symbol) => cadr)
-         (else
-           #f)))
+         ((assq symbol local-cell) => cadr)
+         (else #f)))
 
-     (define (%lookup-environment symbol global stack )
+     (define (%lookup-environment symbol global stack)
          (let loop ((stack stack))
             (cond
-              ((null? stack)
-               (%global-lookup symbol global))
+              ((null? stack) (%global-lookup symbol global))
               ((%local-cell-lookup symbol (car stack)))
               (else (loop (cdr stack))))))
 
@@ -89,14 +87,27 @@
                expand-environment))
            (cdr scm-code))))
 
+     (define (%dot-or-list->list formals)
+       (let loop ((fmls formals)
+                  (res '()))
+         (cond
+           ((null? fmls) res)
+           ((not-pair? fmls) (cons fmls res))
+           (else (loop (cdr fmls) (cons (car fmls) res))))))
+
      (define (%list-expand-lambda scm-code global
                                   stack expand-environment)
-       (let* ((bodies
+       ;;stackはlist of alist
+       ;(list 'undefined symbol)
+       (let* ((args-list (%dot-or-list->list (cadr scm-code)))
+              (stack-cell (map (lambda (x) (list x (list 'undefined x)))
+                               args-list))
+              (bodies
                 (map (lambda (expression)
                        (onif-expand
                          expression
                          global
-                         stack
+                         (cons stack-cell stack)
                          expand-environment))
                      (cddr scm-code)))
              (body
