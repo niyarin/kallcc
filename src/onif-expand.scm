@@ -53,6 +53,13 @@
               ((%local-cell-lookup symbol (car stack)))
               (else (loop (cdr stack))))))
 
+     (define (%local-var? symbol stack)
+       (let loop ((stack stack))
+         (cond
+           ((null? stack) #f)
+           ((%local-cell-lookup symbol (car stack)) #t)
+           (else (loop (cdr stack))))))
+
      (define (%expand-environment-ref symbol expand-environment)
        (cond
           ((assv symbol expand-environment) => cadr)
@@ -147,6 +154,13 @@
          ,(cadr scm-code)
          ,(onif-expand (caddr scm-code) global stack expand-environment)))
 
+     (define (%list-expand-set! scm-code global stack expand-environment)
+       `(,(cadr (%expand-environment-syntax-symbol-hash-ref
+                     (if (%local-var? (cadr scm-code) stack) 'local-set! 'set!)
+                       expand-environment))
+         ,(cadr scm-code)
+         ,(onif-expand (caddr scm-code) global stack expand-environment)))
+
      (define (%list-expand operator scm-code global stack expand-environment)
         "operator is pair. example. (built-in-lambda . ONIF-SYMBOL)"
         (scmspec/lcheck ((input (operator (scmspec/pair symbol? scmspec/any?))))
@@ -158,6 +172,8 @@
                   (%list-expand-if scm-code global stack expand-environment))
                  ((built-in-define)
                   (%list-expand-define scm-code global stack expand-environment))
+                 ((built-in-set!)
+                  (%list-expand-set! scm-code global stack expand-environment))
                  ((built-in-quote)
                      (list (cadr (%expand-environment-syntax-symbol-hash-ref
                                  'quote

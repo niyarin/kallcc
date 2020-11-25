@@ -11,7 +11,8 @@
                  (scheme hash-table)
                  (onif symbol))))
 
-   (export onif-scm-env-tiny-core
+   (export onif-scm-env-tiny-core;;remove
+           onif-scm-env/tiny-core
            onif-scm-env/make-env-for-library)
 
    (begin
@@ -27,9 +28,11 @@
                        (if . (built-in-if ,(onif-symbol 'IF)))
                        (define . (built-in-define  ,(onif-symbol 'DEFINE)))
                        (set! . (built-in-set! ,(onif-symbol 'SET!)))
+                       (local-set! . (built-in-local-set! ,(onif-symbol 'LOCCAL-SET!)))
                        (quote . (built-in-quote ,(onif-symbol 'QUOTE)))
                        (define-syntax . (built-in-define-syntax ,(onif-symbol 'DEFINE-SYNTAX)))
-                       (let-syntax . (built-in-set! ,(onif-symbol 'LET-SYNTAX)))
+                       (let-syntax . (built-in-let-syntax ,(onif-symbol 'LET-SYNTAX)))
+                       (syntax-rules . (built-in-syntax-rules ,(onif-symbol 'SYNTAX-RULES)))
                        (begin . (built-in-begin ,(onif-symbol 'BEGIN)))
                        (define-library . (built-in-define-library ,(onif-symbol 'DEFINE-LIBRARY-SYNTAX)))
                        (import . (built-in-import ,(onif-symbol 'IMPORT-SYNTAX)))
@@ -55,6 +58,10 @@
                        (fxior . (built-in-fxior ,(onif-symbol 'FXIOR)))
                        (fxnot . (built-in-fxnot ,(onif-symbol 'FXNOT)))
 
+                       (vector-set! . (built-in-vector-set! ,(onif-symbol 'VECTOR-SET!)))
+                       (make-vector . (built-in-make-vector ,(onif-symbol 'MAKE-VECTOR)))
+
+
                        (bytevector-u8-ref . (built-in-bytevector-u8-ref ,(onif-symbol 'BYTEVECTOR-U8-REF)))
                        (bytevector-u8-set! . (built-in-bytevector-u8-set! ,(onif-symbol 'BYTEVECTOR-U8-SET!)))
                        (make-bytevector . (built-in-make-bytevector ,(onif-symbol 'MAKE-BYTEVECTOR)))
@@ -71,6 +78,6 @@
                     (assq symbol tiny-core))
                   '(import export begin))
              eq?)))
+     (define (onif-scm-env/tiny-core) (alist->hash-table (%scm-env-tiny-core) eq?))
 
-     (define (onif-scm-env-tiny-core)
-         (alist->hash-table (%scm-env-tiny-core) eq?))))
+     (define onif-scm-env-tiny-core onif-scm-env/tiny-core)))
