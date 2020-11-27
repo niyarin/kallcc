@@ -60,9 +60,7 @@
               (libname-table
                 (->> (concatenate libname-imported-libnames-list)
                      delete-duplicates
-                     (onif-misc/map-indexed
-                       (lambda (index namespace)
-                         (cons namespace index))))))
+                     (onif-misc/map-indexed xcons))))
          (->> libname-imported-libnames-list
               (map (lambda (namespace)
                      (map (lambda (libname)
@@ -107,17 +105,18 @@
 
       (define (onif-phases/expand-namespaces this-expressions
                                              namespaces expand-environment)
+        ;;たぶん、namespacesは依存関係でトポロジカルソートされている必要がある。
         (->> (append namespaces (list `(() ((body ,this-expressions)))))
              (fold (lambda (namespace res)
                      ;;各ライブラリの中身はpre-expandされていないので、ここで適用
                      (let* ((global (cadr (assq 'syntax-symbol-hash expand-environment)))
                             (pre-expanded-expressions
                                  ;(() code) (<libname> code) ... )
-                                 (onif-phases/pre-expand (onif-misc/namespace-assq 'body namespace)
+                                 (onif-phases/pre-expand (knamespace/body namespace)
                                                          global))
                             (target-namespace (car pre-expanded-expressions)))
                         (cons (cons (car namespace)
-                                    (%expand-loop (onif-misc/namespace-assq 'body target-namespace)
+                                    (%expand-loop (knamespace/body target-namespace)
                                                   global expand-environment res))
                               res)))
                    '())))
@@ -181,22 +180,19 @@
                               (car namespace)
                               (cons* `(body ,(cddr namespace))
                                      `(name ,(car namespace))
-                                      (cadr namespace)))))))
-               (imported-rename
-                 (begin
-                    (map (lambda (namespace rename-alist)
-                           (->> (cadr namespace)
-                                (assq 'body)
-                                cadr
-                                (for-each (lambda (expression)
-                                              (onif-alpha/simple-conv!
-                                                expression
-                                                rename-alist
-                                                global)))))
-                         namespaces
-                         (onif-phases/solve-imported-symbol namespaces))
-                    namespaces)))
-            imported-rename))
+                                      (cadr namespace))))))))
+          (map (lambda (namespace rename-alist)
+                 (->> (cadr namespace)
+                      (assq 'body)
+                      cadr
+                      (for-each (lambda (expression)
+                                    (onif-alpha/simple-conv!
+                                      expression
+                                      rename-alist
+                                      global)))))
+                   namespaces
+                   (onif-phases/solve-imported-symbol namespaces))
+          namespaces))
 
       (define (onif-phases/cps-conv namespaces)
          (->> namespaces
@@ -248,7 +244,7 @@
           (fold (lambda  (namespace offset)
                    (let ((symbol-hash
                            (%namespace-assq 'syntax-symbol-hash namespace)))
-                      (->> (%namespace-assq 'body  namespace)
+                      (->> (knamespace/body namespace)
                            (fold (lambda (expression expression-offset)
                                    (let-values (((flat-code _id-lambdas)
                                                  (onif-flat-flat-code&id-lambdas
@@ -264,7 +260,7 @@
                                  '())
                            ;Current data format is ((flat code id-lambdas) ...)
                            ((lambda (expression-offsets)
-                              (let ((lambdas   (append-map cadr expression-offsets)))
+                              (let ((lambdas (append-map cadr expression-offsets)))
                                  (onif-misc/ft-pair-push!
                                    res
                                    `(,(car namespace)
@@ -310,11 +306,12 @@
                           onif-new-asm/tune)))))
 
        (define (onif-phase/new-asm namespaces)
-           (let* ((global-ids-box (onif-new-asm/make-global-ids-box))
+           (let* ((rnamespaces (reverse namespaces))
+                  (global-ids-box (onif-new-asm/make-global-ids-box))
                   (jump-box (list 0))
-                  (bodies (%new-asm-body namespaces global-ids-box jump-box))
+                  (bodies (%new-asm-body rnamespaces global-ids-box jump-box))
                   (_ (begin (onif-idebug/debug-display (concatenate bodies))(newline)))
-                  (funs (%new-asm-funs namespaces global-ids-box jump-box)))
+                  (funs (%new-asm-funs rnamespaces global-ids-box jump-box)))
                (append
                  funs
                  (concatenate bodies)
