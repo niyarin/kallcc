@@ -87,6 +87,7 @@ This phase rules.
         (let loop ((code code))
          (cond
            ((and (null? code) beg-flag (last-pair scm-code))
+            (display "ALL DONE!")(newline)
               ;begin式の返り値のための処理
               (%begin-last-expression scm-code stack onif-symbol-hash))
            ((null? code);;全引数見た。
@@ -101,8 +102,8 @@ This phase rules.
                         (%conv-stack-cell-csymbol (car stack)))
                    (cddr res-top-cell)))
            ((%onif-not-have-continuation? (car code) onif-symbol-hash)
-            => (lambda (cont-val)
-                  (set-cdr! res-cell (cons (car cont-val) '()))
+            => (lambda (const-box)
+                  (set-cdr! res-cell (cons (car const-box) '()))
                   (set! res-cell (cdr res-cell))
                   (loop (cdr code))))
            ((and (pair? code) (null? (cdr code)) beg-flag)
@@ -117,12 +118,23 @@ This phase rules.
                                 stack)
                           onif-symbol-hash))))))
 
+      (define (%ls-head-cell&cell code next)
+        (let* ((head-cell (list #f))
+               (cell head-cell))
+          (let loop ((code code))
+            (if (eq? code next)
+              (values head-cell cell)
+              (begin
+                (set-cdr! cell (list (car code)))
+                (set! cell (cdr cell))
+                (loop (cdr code)))))))
+
       (define (%cps-conv-frun-next scm-code next stack onif-symbol-hash . beg-flag)
-         (let* ((res-top-cell (cons #f scm-code))
-                (res-cell next)
-                (beg-flag (if (null? beg-flag) #f (car beg-flag))))
+         (let-values (((res-top-cell res-cell)
+                       (%ls-head-cell&cell scm-code next)))
+           (let ((beg-flag (if (null? beg-flag) #f (car beg-flag))))
           (%cps-conv-frun-loop next res-top-cell res-cell stack
-                               onif-symbol-hash beg-flag)))
+                               onif-symbol-hash beg-flag))))
 
       (define (%cps-conv-frun scm-code stack onif-symbol-hash . beg-flag)
          "この中では、関数適用だけではなく、begin式の展開にも使う。そのときはbeg-flagが立っている"
@@ -172,5 +184,7 @@ This phase rules.
               (else (%cps-conv-frun scm-code stack onif-symbol-hash)))))
 
       (define (onif-cps-conv scm-code onif-symbol-hash)
-        (%cps-conv scm-code #f (list (%conv-stack-cell '() #f #f))
-                   onif-symbol-hash))))
+        (if (boolean? scm-code);;あとで、ATOM全体に変えとく(定数はcps変換しない)
+          scm-code
+          (%cps-conv scm-code #f (list (%conv-stack-cell '() #f #f))
+                   onif-symbol-hash)))))
