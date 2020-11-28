@@ -48,15 +48,11 @@ This phase rules.
             (list expression))
            ((%lambda-operator? (car expression) onif-symbol-hash)
             (let ((cps-symbol (onif-symbol)))
-              (list
-                 (list
-                   (onif-misc/onif-symbol-hash-ref onif-symbol-hash 'lambda)
-                   (cons cps-symbol (cadr expression))
-                  (%cps-conv
-                    (car (cddr expression))
-                    (list (%conv-stack-cell cps-symbol #f))
-                    onif-symbol-hash
-                    )))))
+              `((,(onif-misc/onif-symbol-hash-ref onif-symbol-hash 'lambda)
+                 ,(cons cps-symbol (cadr expression))
+                 ,(%cps-conv (car (cddr expression))
+                             (list (%conv-stack-cell cps-symbol #f))
+                             onif-symbol-hash)))))
            (else #f)))
 
      (define-record-type <conv-stack-cell>
@@ -79,10 +75,7 @@ This phase rules.
             (cond
               ((not next-expressions) (list begin-cont-symbol res-val))
               (else
-                (map! (lambda (x)
-                        (if (eq? x begin-cont-symbol)
-                          res-val
-                          x))
+                (map! (lambda (x) (if (eq? x begin-cont-symbol) res-val x))
                       next-expressions)
                 (%cps-conv next-expressions (cdr stack) onif-symbol-hash)))))
 
@@ -129,18 +122,17 @@ This phase rules.
                (true-exp (list-ref scm-code 2))
                (false-exp (list-ref scm-code 3)))
            (if test-const-exp
-             (list (car scm-code)
+             (list if-symbol
                    (car test-const-exp)
                    (%cps-conv true-exp stack onif-symbol-hash)
                    (%cps-conv false-exp stack onif-symbol-hash))
              (let ((new-sym (onif-symbol)))
                  (%cps-conv
                   (cadr scm-code)
-                  (cons (%conv-stack-cell new-sym
-                                         `(,if-symbol
-                                           ,new-sym ,true-exp ,false-exp))
-
-                    stack)
+                  (cons (%conv-stack-cell
+                          new-sym
+                          `(,if-symbol ,new-sym ,true-exp ,false-exp))
+                        stack)
                   onif-symbol-hash)))))
 
       (define (%cps-conv scm-code stack onif-symbol-hash)
