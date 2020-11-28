@@ -1,6 +1,6 @@
 (define-library (kallcc namespace)
   (import (scheme base) (scheme list))
-  (export namespace? nassq)
+  (export namespace? nassq body)
   (begin
     (define (namespace? object)
       (and (list? object)
@@ -15,4 +15,7 @@
           ((assq key (cadr namespace)) => cadr)
           ((not (null? default)) (car default))
           (else (error "Namespace doesn't have key."
-                       key namespace))))))
+                       key namespace))))
+
+    (define (body namespace)
+      (nassq 'body namespace))))

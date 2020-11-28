@@ -179,8 +179,10 @@
                                  'quote
                                  expand-environment))
                            (cadr scm-code)))
+                 ((built-in-syntax-error)
+                    (erorr "Syntax error"))
                  ((built-in-car built-in-cdr built-in-cons built-in-eq?
-                   built-in-vector-set! built-in-make-vector
+                   built-in-vector-set! built-in-make-vector built-in-vector-length built-in-vector-ref
                    built-in-fx+ built-in-fx- built-in-fx* built-in-fx=?
                    built-in-fxremainder
                    built-in-fx<?  built-in-make-bytevector
@@ -228,7 +230,9 @@
            ((and (pair? scm-code) (symbol? (car scm-code)))
             (let ((operator (%lookup-environment (car scm-code) global stack)))
                (%list-expand operator scm-code global stack expand-environment)))
-           ((and (pair? scm-code) (list? (car scm-code))) (error "TBW!" scm-code))
+           ((and (pair? scm-code) (list? (car scm-code)))
+            ;;specを強引に回避しているので跡で見直す
+            (%list-expand (cons '_ #f) scm-code global stack expand-environment))
            (else scm-code)))
 
      (define onif-expand onif-expand/expand)

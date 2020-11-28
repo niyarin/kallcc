@@ -12,6 +12,7 @@
 (include "./onif-opt-names.scm")
 (include "./onif-my-specs.scm")
 (include "./kallcc-namespace.scm")
+(include "./kallcc-misc.scm")
 
 (define-library (onif phases)
    (import (scheme base) (scheme list) (scheme cxr) (srfi 69);scheme hash
@@ -21,7 +22,8 @@
            (onif idebug) (onif symbol) (onif scm env)
            (onif meta-lambda) (onif name-ids) (onif alpha conv) (onif flat-lambda) (onif misc)
            (onif new-asm) (onif expand) (onif cps) (onif opt names)
-           (prefix (kallcc namespace) knamespace/))
+           (prefix (kallcc namespace) knamespace/)
+           (prefix (kallcc misc) kmisc/))
    (export onif-phases/pre-expand onif-phases/expand-namespaces
            onif-phases/solve-imported-name onif-phases/solve-imported-symbol
            onif-phases/alpha-conv! onif-phases/first-stage
@@ -153,8 +155,10 @@
          (map (lambda (namespace)
                 (append-map
                   (lambda (libname)
-                        (knamespace/nassq 'export-rename
-                                          (assoc libname namespaces)))
+                    (cond
+                      ((assoc libname namespaces)
+                       => (lambda (lib) (knamespace/nassq 'export-rename lib)))
+                      (else (kmisc/kerror "No library." libname))))
                   (knamespace/nassq 'import-libraries namespace)))
               namespaces))
 

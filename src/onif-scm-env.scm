@@ -33,6 +33,7 @@
                        (define-syntax . (built-in-define-syntax ,(onif-symbol 'DEFINE-SYNTAX)))
                        (let-syntax . (built-in-let-syntax ,(onif-symbol 'LET-SYNTAX)))
                        (syntax-rules . (built-in-syntax-rules ,(onif-symbol 'SYNTAX-RULES)))
+                       (syntax-error . (built-in-syntax-error ,(onif-symbol 'SYNTAX-ERROR)))
                        (begin . (built-in-begin ,(onif-symbol 'BEGIN)))
                        (define-library . (built-in-define-library ,(onif-symbol 'DEFINE-LIBRARY-SYNTAX)))
                        (import . (built-in-import ,(onif-symbol 'IMPORT-SYNTAX)))
@@ -60,6 +61,8 @@
 
                        (vector-set! . (built-in-vector-set! ,(onif-symbol 'VECTOR-SET!)))
                        (make-vector . (built-in-make-vector ,(onif-symbol 'MAKE-VECTOR)))
+                       (vector-length . (built-in-vector-length ,(onif-symbol 'VECTOR-LENGTH)))
+                       (vector-ref . (built-in-vector-ref ,(onif-symbol 'VECTOR-REF)))
 
 
                        (bytevector-u8-ref . (built-in-bytevector-u8-ref ,(onif-symbol 'BYTEVECTOR-U8-REF)))
