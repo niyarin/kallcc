@@ -65,6 +65,10 @@ This phase rules.
          (cont-symbol %conv-stack-cell-csymbol %conv-stack-cell-set-csymbol!)
          (expression %conv-stack-cell-expression %conv-stack-cell-set-expression!))
 
+     (define (%conv-stack-cell->list stack-cell)
+       (list (%conv-stack-cell-csymbol stack-cell)
+             (%conv-stack-cell-expression stack-cell)))
+
       (define (%cps-conv-begin scm-code stack onif-symbol-hash)
         (%cps-conv-frun scm-code stack onif-symbol-hash #t))
 
@@ -73,7 +77,7 @@ This phase rules.
               (begin-cont-symbol (%conv-stack-cell-csymbol (car stack)))
               (next-expressions (%conv-stack-cell-expression (car stack))))
             (cond
-              ((not next-expressions) res-val)
+              ((not next-expressions) (list begin-cont-symbol res-val))
               (else
                 (map! (lambda (x)
                         (if (eq? x begin-cont-symbol)
@@ -107,6 +111,8 @@ This phase rules.
                           (set-cdr! res-cell (cons (car cont-val) '()))
                           (set! res-cell (cdr res-cell))
                           (loop (cdr code))))
+                   ((and (pair? code) (null? (cdr code)) beg-flag)
+                    (%cps-conv (car code) stack onif-symbol-hash))
                    (else;;;継続がある
                      (let ((new-sym (onif-symbol)))
                        (set-cdr! res-cell (cons new-sym (cdr code)))
