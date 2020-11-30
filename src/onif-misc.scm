@@ -13,11 +13,12 @@
            onif-misc/begin-operator?
            onif-misc/lambda-meta-operator?
            onif-misc/define-operator?
+           onif-misc/set!-operator?
            onif-misc/if-operator?
+           onif-misc/local-set!-operator?
            onif-misc/quote-operator?
            onif-misc/onif-symbol-hash-ref
            onif-misc/ref-operations
-           onif-misc/filter-&-elses
            onif-misc/ft-pair
            onif-misc/ft-pair-res
            onif-misc/ft-pair-push!
@@ -64,6 +65,12 @@
      (define onif-misc/define-syntax?
        (onif-misc/make-check-onif-symbol-base-function 'define-syntax))
 
+     (define onif-misc/set!-operator?
+       (onif-misc/make-check-onif-symbol-base-function 'set!))
+
+     (define onif-misc/local-set!-operator?
+       (onif-misc/make-check-onif-symbol-base-function 'local-set!))
+
      (define (onif-misc/onif-symbol-hash-ref onif-symbol-hash symbol)
         (cond
           ((hash-table-ref onif-symbol-hash symbol) => cadr)
@@ -73,7 +80,7 @@
        (if (not (onif-symbol? operator))
          #f
          (case (onif-symbol/ref-symbol operator)
-            ((CONS CAR CDR PAIR? SET-CAR! SET-CDR! FX+ FX- FX=? FX<? EQ? FXREMAINDER
+            ((CONS CAR CDR PAIR? SET-CAR! SET-CDR! FX+ FX- FX* FX=? FX<? EQ? FXREMAINDER
               MAKE-VECTOR VECTOR-SET!
               BYTEVECTOR-U8-REF BYTEVECTOR-U8-SET! MAKE-BYTEVECTOR BYTEVECTOR-LENGTH)
              => (lambda (x) x))
@@ -94,21 +101,6 @@
          (when (pair? cell)
             (fn cell)
             (loop (cdr cell)))))
-
-     (define (onif-misc/filter-&-elses fn ls)
-       (let ((res1 (onif-misc/ft-pair))
-             (elses (onif-misc/ft-pair)))
-          (let loop ((ls ls))
-            (cond ((null? ls)
-                   (values
-                       (onif-misc/ft-pair-res res1)
-                       (onif-misc/ft-pair-res elses)))
-                  ((fn (car ls))
-                   (onif-misc/ft-pair-push! res1 (car ls))
-                   (loop (cdr ls)))
-                  (else
-                   (onif-misc/ft-pair-push! elses (car ls))
-                   (loop (cdr ls)))))))
 
     (define (onif-misc/map-indexed f ls)
       (let ((res-cell (onif-misc/ft-pair)))

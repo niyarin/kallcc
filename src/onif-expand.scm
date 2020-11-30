@@ -201,7 +201,8 @@
                      (let ((syntax-object
                              (onif-expand/make-syntax-object
                                (list-ref scm-code 2) global stack)))
-                       (hash-table-set! global (cadr scm-code) syntax-object)))
+                       (hash-table-set! global (cadr scm-code) syntax-object)
+                       #f))
                  ((built-in-begin)
                   (%list-expand-begin
                     scm-code global stack expand-environment))
@@ -250,7 +251,7 @@
 
      (define (onif-expand/separate-namespaces expressions global)
        (let-values (((namespaces this-expressions)
-                        (onif-misc/filter-&-elses
+                        (partition
                           (lambda (x)
                             (and (pair? x)
                                  (eq? 'built-in-define-library
