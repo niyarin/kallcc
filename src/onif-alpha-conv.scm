@@ -70,29 +70,27 @@
              (let loop ((code code)
                         (stk initial-stk))
                (cond
-                 ((symbol? code)
-                  (%symbol-conv code stk))
+                 ((symbol? code) (%symbol-conv code stk))
                  ((not (list? code)) code)
                  ((null? code) '())
                  ((onif-misc/quote-operator? (car code) onif-symbol-hash) code)
                  ((%lambda-operator? (car code) onif-symbol-hash)
                   (let* ((formals (cadr code))
                          (stack-cell
-                             (map
-                               (lambda (x)
-                                  (let ((conflicted (%lookup-stack x stk)))
-                                    (if conflicted
+                             (map (lambda (x)
+                                    (if (%lookup-stack x stk)
                                        (list x (onif-symbol x))
-                                       (list x x))))
-                               formals)))
+                                       (list x x)))
+                                  formals)))
                     (begin
-                       (set-car!  (cdr code) (map cadr stack-cell))
-                       (set-cdr!  (cdr code)
-                                  (map
-                                     (lambda (body)
+                      ;;rename-formal
+                      (set-car! (cdr code) (map cadr stack-cell))
+                      ;;rename body
+                      (set-cdr! (cdr code)
+                                (map (lambda (body)
                                         (loop body (cons stack-cell stk)))
                                      (cddr code)))
-                       code)))
+                      code)))
                  (else
                    (onif-misc/for-each-cell1
                      (lambda (cell)
@@ -103,7 +101,8 @@
                    code)))
 
             (cond
-              ((and (onif-misc/define-operator? (car code) onif-symbol-hash)
+              ((and (list? code)
+                    (onif-misc/define-operator? (car code) onif-symbol-hash)
                     (%lookup-stack (cadr code) initial-stk))
                => (lambda (renamed-symbol) (set-car! (cdr code) renamed-symbol)))
               (else)))))))
