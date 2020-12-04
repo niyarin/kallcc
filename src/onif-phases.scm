@@ -97,7 +97,7 @@
                   ((onif-expand/export-expression? (car expressions) global)
                       (loop (cdr expressions);TODO: Support rename
                             global
-                            (cons `(export-symbols ,(cdar expressions))
+                           (cons `(export-symbols ,(cdar expressions))
                                   expand-environment)))
                   (else
                     (onif-misc/ft-pair-push!
@@ -298,15 +298,17 @@
                      (->> (reverse (%namespace-assq 'body namespace))
                           (append-map
                             (lambda (body)
-                                 (cons
-                                   '(BODY-START)
-                                   (onif-new-asm/convert
+                              (if (boolean? body)
+                                '()
+                                (cons
+                                  '(BODY-START)
+                                  (onif-new-asm/convert
                                        body '(()) 0 '() '();body use-registers offset lock local-register
                                        '()
                                        global-ids-box
                                        jump-box
                                        (%namespace-assq 'syntax-symbol-hash
-                                                        namespace)))))
+                                                        namespace))))))
                           onif-new-asm/tune)))))
 
        (define (onif-phase/new-asm namespaces)

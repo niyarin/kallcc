@@ -28,7 +28,7 @@
                        (if . (built-in-if ,(onif-symbol 'IF)))
                        (define . (built-in-define  ,(onif-symbol 'DEFINE)))
                        (set! . (built-in-set! ,(onif-symbol 'SET!)))
-                       (local-set! . (built-in-local-set! ,(onif-symbol 'LOCCAL-SET!)))
+                       (local-set! . (built-in-local-set! ,(onif-symbol 'LOCAL-SET!)))
                        (quote . (built-in-quote ,(onif-symbol 'QUOTE)))
                        (define-syntax . (built-in-define-syntax ,(onif-symbol 'DEFINE-SYNTAX)))
                        (let-syntax . (built-in-let-syntax ,(onif-symbol 'LET-SYNTAX)))
