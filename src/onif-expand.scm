@@ -13,6 +13,7 @@
            (onif scm env) (onif misc) (onif symbol)
            (onif syntax-rules)
            (niyarin thread-syntax)
+           (prefix (kallcc misc) kmisc/)
            (scmspec core)
            (scheme write);DEBUG
            )
@@ -210,17 +211,14 @@
                  ((user-syntax)
                   (let* ((syntax-rules-object (cadr operator))
                          (syntax-global (onif-syntax-rules/ref-global syntax-rules-object))
-                         (macro-expanded (onif-syntax-rules/expand syntax-rules-object scm-code)))
-                      (display ">>")(display macro-expanded)(newline)
-                      (onif-expand/expand macro-expanded global stack expand-environment)))
-                 (else ;FUNC RUN
-                     (map
-                       (lambda (expression)
-                         (onif-expand
-                           expression
-                           global
-                           stack
-                           expand-environment))
+                         (macro-expanded
+                           (onif-syntax-rules/expand
+                             syntax-rules-object scm-code)))
+                      (onif-expand/expand macro-expanded global stack
+                                          expand-environment)))
+                 (else (map (lambda (expression)
+                               (onif-expand expression global
+                                            stack expand-environment))
                      scm-code))))))
 
      (define (onif-expand/expand scm-code global stack expand-environment)
@@ -339,23 +337,27 @@
                ((built-in-syntax-rules)
                 (let* ((have-ellip (symbol? (cadr syntax)))
                        (ellipsis (if have-ellip (cadr exntax) '...))
-                      (literals (if have-ellip
-                                  (list-ref syntax 2)
-                                  (cadr syntax)))
-                      (body (if have-ellip (cdddr syntax) (cddr syntax))))
+                       (literals (if have-ellip
+                                   (list-ref syntax 2)
+                                   (cadr syntax)))
+                       (body (if have-ellip (cdddr syntax) (cddr syntax)))
+                       (evacuation-symbol-dict
+                          (map
+                            (lambda (x) (cons x (onif-symbol x)))
+                            (set->list
+                              (kmisc/scm-expression->symbol-set body)))))
                   (list 'user-syntax
-                       (onif-syntax-rules/make-syntax-rules
+                        (onif-syntax-rules/make-syntax-rules
                            ellipsis literals body
                            global stack))))
                (else (error "MACRO!"))))))
 
      (define (onif-expand/defined-symbols expressions symbol-hash)
-       (->> expressions
-            (map (lambda (expression)
-                    (cond
-                      ((not-pair? expression) #f)
-                      ((onif-misc/define-operator?
-                         (car expression) symbol-hash)
-                       (cadr expression))
-                      (else #f))))
-             (filter (lambda (x) x))))))
+       (filter-map
+         (lambda (expression)
+           (cond
+             ((not-pair? expression) #f)
+              ((onif-misc/define-operator?  (car expression) symbol-hash)
+               (cadr expression))
+             (else #f)))
+         expressions))))

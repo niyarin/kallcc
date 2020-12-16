@@ -1,5 +1,7 @@
-(include "./onif-expand.scm")
 (include "./onif-symbol.scm")
+(include "./kallcc-symbol.scm")
+(include "./kallcc-misc.scm")
+(include "./onif-expand.scm")
 (include "./lib/thread-syntax.scm")
 (include "./onif-idebug.scm")
 (include "./onif-scm-env.scm")
@@ -12,7 +14,6 @@
 (include "./onif-opt-names.scm")
 (include "./onif-my-specs.scm")
 (include "./kallcc-namespace.scm")
-(include "./kallcc-misc.scm")
 
 (define-library (onif phases)
    (import (scheme base) (scheme list) (scheme cxr) (srfi 69);scheme hash

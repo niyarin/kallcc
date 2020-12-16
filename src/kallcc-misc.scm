@@ -1,10 +1,16 @@
 (define-library (kallcc misc)
   (import (scheme base)
           (scheme comparator)
-          (scheme set))
-  (export kerror make-tconc tconc-head tconc-push! scm-expression->symbol-set)
+          (scheme set)
+          (prefix (kallcc symbol) ksymbol/))
+  (export kerror make-tconc tconc-head tconc-push! scm-expression->symbol-set
+          rename-symbol-in-expression)
   (begin
     (define kerror error)
+
+    (define (var? obj)
+      (or (symbol? obj)
+          (ksymbol/kallcc-symbol? obj)))
 
     (define-record-type <tconc>
       (%make-tconc head tail)
@@ -29,9 +35,21 @@
           ((pair? expression)
            (append (%scm-expression->symbol-list (car expression))
                    (%scm-expression->symbol-list (cdr expression))))
-          ((symbol? expression) (list expression))
+          ((var? expression) (list expression))
           (else '()))))
 
     (define (scm-expression->symbol-set expression)
       (list->set (make-eq-comparator)
-                 (%scm-expression->symbol-list expression)))))
+                 (%scm-expression->symbol-list expression)))
+
+    (define (rename-symbol-in-expression expression alist)
+      (let loop ((expression expression))
+        (cond
+          ((pair? expression)
+           (cons (loop (car expression))
+                 (loop (cdr expression))))
+          ((and (symbol? expression)
+                (assq expression alist))
+           => cdr)
+          (else expression))))
+    ))
