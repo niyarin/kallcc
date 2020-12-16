@@ -8,6 +8,7 @@
 ;TODO:fix import expression
 (define-library (onif expand)
    (import (scheme base) (scheme cxr) (scheme list)
+           (scheme set)
            (srfi 125)
            (onif scm env) (onif misc) (onif symbol)
            (onif syntax-rules)
@@ -207,13 +208,11 @@
                   (%list-expand-begin
                     scm-code global stack expand-environment))
                  ((user-syntax)
-                  (let ((q (onif-syntax-rules/expand (cadr operator) scm-code)))
-                    (display ">>")(display q)(newline))
-                  (onif-expand/expand
-                    (onif-syntax-rules/expand (cadr operator) scm-code)
-                    global
-                    stack
-                    expand-environment))
+                  (let* ((syntax-rules-object (cadr operator))
+                         (syntax-global (onif-syntax-rules/ref-global syntax-rules-object))
+                         (macro-expanded (onif-syntax-rules/expand syntax-rules-object scm-code)))
+                      (display ">>")(display macro-expanded)(newline)
+                      (onif-expand/expand macro-expanded global stack expand-environment)))
                  (else ;FUNC RUN
                      (map
                        (lambda (expression)
@@ -346,7 +345,8 @@
                       (body (if have-ellip (cdddr syntax) (cddr syntax))))
                   (list 'user-syntax
                        (onif-syntax-rules/make-syntax-rules
-                           ellipsis literals body))))
+                           ellipsis literals body
+                           global stack))))
                (else (error "MACRO!"))))))
 
      (define (onif-expand/defined-symbols expressions symbol-hash)

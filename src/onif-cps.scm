@@ -82,9 +82,9 @@ This phase rules.
                       next-expressions)
                 (%cps-conv next-expressions #f (cdr stack) onif-symbol-hash)))))
 
-      (define (%cps-conv-frun-loop code res-top-cell res-cell
+      (define (%cps-conv-frun-loop scm-code res-top-cell res-cell
                                    stack onif-symbol-hash beg-flag)
-        (let loop ((code code))
+        (let loop ((code scm-code))
          (cond
            ((and (null? code) beg-flag (last-pair scm-code))
             (display "ALL DONE!")(newline)
@@ -114,7 +114,8 @@ This phase rules.
                (%cps-conv (car code)
                           #f
                           (cons (%conv-stack-cell new-sym
-                                                  (cdr res-top-cell) (cddr res-cell))
+                                                  (cdr res-top-cell)
+                                                  (cddr res-cell))
                                 stack)
                           onif-symbol-hash))))))
 
@@ -157,9 +158,11 @@ This phase rules.
              (let ((new-sym (onif-symbol)))
                  (%cps-conv
                   (cadr scm-code)
+                  #f
                   (cons (%conv-stack-cell
                           new-sym
-                          `(,if-symbol ,new-sym ,true-exp ,false-exp))
+                          `(,if-symbol ,new-sym ,true-exp ,false-exp)
+                          #f)
                         stack)
                   onif-symbol-hash)))))
 
@@ -187,4 +190,4 @@ This phase rules.
         (if (boolean? scm-code);;あとで、ATOM全体に変えとく(定数はcps変換しない)
           scm-code
           (%cps-conv scm-code #f (list (%conv-stack-cell '() #f #f))
-                   onif-symbol-hash)))))
+                     onif-symbol-hash)))))
