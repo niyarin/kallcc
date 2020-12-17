@@ -187,17 +187,25 @@
      (define (%asm-define code use-registers register-offset
                           lock-registers local-register global-ids-box onif-symbol-hash)
        (let ((global (%global-ref! (caddr code) global-ids-box))
-             (body (%asm-arg1 (cadddr code) use-registers register-offset
-                              lock-registers local-register global-ids-box onif-symbol-hash))
              (continuation (cadr code)))
          (if (and (null? continuation) (null? local-register))
+           (let ((body (%asm-arg1 (cadddr code) use-registers register-offset
+                                  lock-registers local-register global-ids-box onif-symbol-hash)))
            `(,@body
               (SET! ,global (R ,register-offset))
-              (CONCATENATE-BODY))
-           `(,@body
-              (SET! ,global (R ,register-offset))
-              (SET! (R 0) ())
-              (CALL 1)))))
+              (CONCATENATE-BODY)))
+           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;lockレジスターが完全でない
+           (let* ((r0 (%safety-register register-offset 0 lock-registers))
+                  (r1 (%safety-register register-offset 0 (cons r0 lock-registers)))
+                  (cont-arg (%asm-arg1 (cadr code) use-registers r0
+                                      lock-registers local-register global-ids-box onif-symbol-hash))
+                  (body-arg (%asm-arg1 (cadddr code) use-registers r1
+                                      lock-registers local-register global-ids-box onif-symbol-hash)))
+             `(,@cont-arg
+               ,@body-arg
+                (SET! ,global (R ,r1))
+                ;(SET! (R 0) ())
+                (CALL 1))))))
 
      (define (%asm-if code register-offset use-registers
                       lock-registers local-register jump-box env global-ids-box onif-symbol-hash)
@@ -252,19 +260,23 @@
              `(,@args
                (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
                (,ope (R ,r1)
-                    (R ,r2)
-                    (R ,r1))))
+                     (R ,r2)
+                     (R ,r1))))
             ((EQ?)
               `(,@args
                (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
                (EQ? (R ,r1) (R ,r2) (R ,r1))))
-
             ((MAKE-VECTOR)
              (if (integer? (caddr code))
                `(,@args
-                  (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
-                  (VECTOR ,(caddr code) (R ,r1)))
-               (error "TBW")))
+                 (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
+                 (VECTOR ,(caddr code)) (R ,r1))
+               `(,@args
+                 (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
+                 (VECTOR (R ,r1) (R ,r2))
+                 (SET! (R ,r1) (R ,r2))
+                 )))
+               ;(error "TBW (make-vector variable) .(currently supported const-number.)")))
             ((VECTOR-SET!)
             `(,@args
                (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
@@ -462,7 +474,6 @@
    (define (%asm-fun-lset id-fun use-registers register-offset lock-registers local-register
                           env global-ids-box jump-box onif-symbol-hash)
     (let* ((meta-function (cadr id-fun)))
-
       (append (%asm-fun-header (car id-fun) (cadr meta-function) (list-ref meta-function 3))
               )))
 
