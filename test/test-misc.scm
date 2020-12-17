@@ -33,7 +33,11 @@
              (set (make-eq-comparator) 'list 'cons 'a 'b 'c 'd)))
    (test-end "test-scm-expression->symbol-set"))
 
-;(begin ;;rename-symbol-in-expression-test
-;   (test-begin "test-rename-symbol-in-expression")
-;   (test-end "test-rename-symbol-in-expression")
-;  )
+(begin ;;rename-symbol-in-expression-test
+   (test-begin "test-rename-symbol-in-expression")
+   (test-equal (kmisc/rename-symbol-in-expression '(foo x y) '((foo . foo2) (y . z)))
+               '(foo2 x z))
+   (let ((sym (ksymbol/kallcc-symbol 'w)))
+     (test-equal (kmisc/rename-symbol-in-expression '(foo x (y 1) (sym y)) '((foo . foo2) (y . z) (sym . w)))
+                 '(foo2 x (z 1) (w z))))
+   (test-end "test-rename-symbol-in-expression"))
