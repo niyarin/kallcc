@@ -25,6 +25,7 @@
                (set! res
                      `((lambda . (built-in-lambda ,(onif-symbol 'LAMBDA)))
                        (lambda-META . (built-in-lambda-meta ,(onif-symbol 'LAMBDA-META)))
+                       (ref-var . (built-in-ref-var ,(onif-symbol 'REF-VAR)))
                        (if . (built-in-if ,(onif-symbol 'IF)))
                        (define . (built-in-define  ,(onif-symbol 'DEFINE)))
                        (set! . (built-in-set! ,(onif-symbol 'SET!)))

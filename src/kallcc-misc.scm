@@ -2,15 +2,18 @@
   (import (scheme base)
           (scheme comparator)
           (scheme set)
+          (onif symbol)
           (prefix (kallcc symbol) ksymbol/))
-  (export kerror make-tconc tconc-head tconc-push! scm-expression->symbol-set
-          rename-symbol-in-expression)
+  (export kerror make-tconc tconc-head tconc-push! scm-expression->symbol-set find-in-expression
+          rename-symbol-in-expression inverse-alist var?)
   (begin
     (define kerror error)
 
     (define (var? obj)
       (or (symbol? obj)
-          (ksymbol/kallcc-symbol? obj)))
+          (onif-symbol? obj)
+          ;(ksymbol/kallcc-symbol? obj)
+          ))
 
     (define-record-type <tconc>
       (%make-tconc head tail)
@@ -29,18 +32,25 @@
        (set-cdr! (%tconc-tail tconc) (list x))
        (%tconc-set-tail! tconc (cdr (%tconc-tail tconc))))
 
-    (define (%scm-expression->symbol-list expression)
+    (define (find-in-expression expression proc)
       (let loop ((expression expression))
         (cond
+          ((proc expression) (list expression))
           ((pair? expression)
-           (append (%scm-expression->symbol-list (car expression))
-                   (%scm-expression->symbol-list (cdr expression))))
-          ((var? expression) (list expression))
+           (append (loop (car expression))
+                   (loop (cdr expression))))
           (else '()))))
 
-    (define (scm-expression->symbol-set expression)
-      (list->set (make-eq-comparator)
-                 (%scm-expression->symbol-list expression)))
+    (define (scm-expression->symbol-set expression . symbol-procedure-opt)
+      (let ((symbol-procedure (if (not (null? symbol-procedure-opt))
+                                (car symbol-procedure-opt)
+                                var?)))
+        (list->set (make-eq-comparator)
+                   (find-in-expression expression symbol-procedure))))
+
+    (define (inverse-alist alist)
+      (map (lambda (apair) (cons (cdr apair) (car apair)))
+           alist))
 
     (define (rename-symbol-in-expression expression alist)
       (let loop ((expression expression))
@@ -48,8 +58,7 @@
           ((pair? expression)
            (cons (loop (car expression))
                  (loop (cdr expression))))
-          ((and (symbol? expression)
+          ((and (var? expression)
                 (assq expression alist))
            => cdr)
-          (else expression))))
-    ))
+          (else expression))))))

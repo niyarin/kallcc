@@ -16,6 +16,7 @@
            onif-misc/set!-operator?
            onif-misc/if-operator?
            onif-misc/local-set!-operator?
+           onif-misc/ref-var-operator?
            onif-misc/quote-operator?
            onif-misc/onif-symbol-hash-ref
            onif-misc/ref-operations
@@ -70,6 +71,9 @@
 
      (define onif-misc/local-set!-operator?
        (onif-misc/make-check-onif-symbol-base-function 'local-set!))
+
+     (define onif-misc/ref-var-operator?
+       (onif-misc/make-check-onif-symbol-base-function 'ref-var))
 
      (define (onif-misc/onif-symbol-hash-ref onif-symbol-hash symbol)
         (cond

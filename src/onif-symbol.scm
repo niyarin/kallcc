@@ -19,9 +19,15 @@
        (case-lambda
          (() (onif-symbol '_))
          ((base-symbol)
+          (unless (or (symbol? base-symbol)
+                      (onif-symbol? base-symbol))
+                  (error "The argument of onif-symbol must be symbol." base-symbol))
           (let ((id *id-counter*))
             (set! *id-counter* (+ *id-counter* 1))
-            (%onif-symbol base-symbol *id-counter*)))))
+            (let ((base-symbol* (if (onif-symbol? base-symbol)
+                                  (%onif-symbol-ref-base-symbol base-symbol)
+                                  base-symbol)))
+            (%onif-symbol base-symbol* *id-counter*))))))
 
       (define (onif-symbol->symbol osym);naive
         (string-append

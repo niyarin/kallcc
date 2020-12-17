@@ -1,5 +1,3 @@
-(include "./onif-symbol.scm")
-
 (define-library (onif idebug)
    (import (scheme base) (onif symbol) (scheme cxr) (scheme write) (scheme list))
    (export onif-idebug-icode->code onif-idebug/debug-display onif-idebug/asm-vis )
@@ -50,15 +48,15 @@
 
      (define (%icode->code icode opt)
       (cond
-         ((onif-symbol? icode)
-            (onif-symbol->symbol icode))
+         ((onif-symbol? icode) (onif-symbol->symbol icode))
          ((null? icode) icode)
-         ((list? icode)
-          (%icode->code/expression-conv icode opt))
+         ((list? icode) (%icode->code/expression-conv icode opt))
+         ((pair? icode)
+          (cons (%icode->code (car icode) opt)
+                (%icode->code (cdr icode) opt)))
          ((vector? icode)
           (vector-map (lambda (x) (%icode->code x opt)) icode))
-         (else
-           icode)))
+         (else icode)))
 
      (define (onif-idebug-icode->code icode . opt)
        (%icode->code icode opt))))

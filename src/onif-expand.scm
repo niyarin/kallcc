@@ -12,8 +12,10 @@
            (srfi 125)
            (onif scm env) (onif misc) (onif symbol)
            (onif syntax-rules)
+           (onif idebug)
            (niyarin thread-syntax)
            (prefix (kallcc misc) kmisc/)
+           (prefix (kallcc symbol) ksymbol/)
            (scmspec core)
            (scheme write);DEBUG
            )
@@ -159,9 +161,69 @@
      (define (%list-expand-set! scm-code global stack expand-environment)
        `(,(cadr (%expand-environment-syntax-symbol-hash-ref
                      (if (%local-var? (cadr scm-code) stack) 'local-set! 'set!)
-                       expand-environment))
+                     expand-environment))
          ,(cadr scm-code)
          ,(onif-expand (caddr scm-code) global stack expand-environment)))
+
+     (define (%expr->symbol-rename-alist expr symbol-proc)
+      (map (lambda (x) (cons x (ksymbol/kallcc-symbol x)))
+           (set->list (kmisc/scm-expression->symbol-set expr symbol-proc))))
+
+     (define (%make-hygenic-symbol sym global stack global* stack*)
+       (let ((local-var1
+               (car (filter-map (lambda (cell) (assq sym cell))
+                                stack)))
+             (local-var2
+                   (filter-map (lambda (cell) (assq sym cell))
+                               stack*)))
+         (cond
+           ((and (null? local-var1)
+                 (null? local-var2)
+                 (eq? global global*))
+            sym)
+           ((eq? global global*) `(global ,(car local-var1)))
+           (else (error "WIP!")))))
+
+     (define (%make-hygenic-rename-alist symbols global stack global* stack* expand-environment)
+       (map (lambda (sym)
+              (let ((hsym (%make-hygenic-symbol sym global stack global* stack*)))
+                (if (pair? hsym)
+                  (cons sym
+                        (list (cadr (%expand-environment-syntax-symbol-hash-ref
+                                      'ref-var expand-environment))
+                              hsym))
+                  (cons sym hsym))))
+            symbols))
+
+     (define (%expand-user-syntax expr srules-object global
+                                  stack expand-environment)
+       ;;stackにつっこむのをわすれるな
+       ;;synatax-globalを使うこと
+       (let* ((syntax-global (onif-syntax-rules/ref-global srules-object))
+              (syntax-stack  (onif-syntax-rules/ref-stack srules-object))
+              (evacuation-symbol-dict (%expr->symbol-rename-alist
+                                        expr kmisc/var?))
+              (pre-renamed-expr
+                (kmisc/rename-symbol-in-expression expr
+                                            evacuation-symbol-dict))
+              (macro-expanded
+                (onif-syntax-rules/expand srules-object pre-renamed-expr))
+              (expanded
+                (onif-expand/expand macro-expanded syntax-global syntax-stack
+                                    expand-environment))
+              (after-symbol-dict
+                (%make-hygenic-rename-alist
+                  (kmisc/find-in-expression expanded symbol?)
+                  global stack syntax-global syntax-stack expand-environment))
+              (after-renamed-expr
+                (kmisc/rename-symbol-in-expression expanded after-symbol-dict))
+              (after-renamed-expr*
+                (kmisc/rename-symbol-in-expression after-renamed-expr
+                                                   (kmisc/inverse-alist evacuation-symbol-dict))))
+        (display "1>>>")(display stack)(newline)
+        (display "2>>>")(onif-idebug/debug-display after-renamed-expr*)(newline)
+        (display "3>>>")(onif-idebug/debug-display after-symbol-dict)(newline)
+        after-renamed-expr*))
 
      (define (%list-expand operator scm-code global stack expand-environment)
         "operator is pair. example. (built-in-lambda . ONIF-SYMBOL)"
@@ -209,13 +271,8 @@
                   (%list-expand-begin
                     scm-code global stack expand-environment))
                  ((user-syntax)
-                  (let* ((syntax-rules-object (cadr operator))
-                         (syntax-global (onif-syntax-rules/ref-global syntax-rules-object))
-                         (macro-expanded
-                           (onif-syntax-rules/expand
-                             syntax-rules-object scm-code)))
-                      (onif-expand/expand macro-expanded global stack
-                                          expand-environment)))
+                   (%expand-user-syntax scm-code (cadr operator) global
+                                        stack expand-environment))
                  (else (map (lambda (expression)
                                (onif-expand expression global
                                             stack expand-environment))
@@ -340,12 +397,7 @@
                        (literals (if have-ellip
                                    (list-ref syntax 2)
                                    (cadr syntax)))
-                       (body (if have-ellip (cdddr syntax) (cddr syntax)))
-                       (evacuation-symbol-dict
-                          (map
-                            (lambda (x) (cons x (onif-symbol x)))
-                            (set->list
-                              (kmisc/scm-expression->symbol-set body)))))
+                       (body (if have-ellip (cdddr syntax) (cddr syntax))))
                   (list 'user-syntax
                         (onif-syntax-rules/make-syntax-rules
                            ellipsis literals body

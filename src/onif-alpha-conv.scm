@@ -57,6 +57,13 @@
                                    (loop (car cell))))))
                 code)))))
 
+     (define (%alpha-conv-ref-var sym-info)
+       (let ((type (car sym-info))
+             (symbol (cadr sym-info)))
+         (cond
+           ((eq? type 'global) symbol)
+           (else (error "!!" sym-info)))))
+
      (define (onif-alpha/conv! code onif-symbol-hash
                                . optional-inital-stack)
        (let ((initial-stk
@@ -73,6 +80,7 @@
                  ((symbol? code) (%symbol-conv code stk))
                  ((not (list? code)) code)
                  ((null? code) '())
+                 ((onif-misc/ref-var-operator? (car code) onif-symbol-hash) (%alpha-conv-ref-var (cadr code)))
                  ((onif-misc/quote-operator? (car code) onif-symbol-hash) code)
                  ((%lambda-operator? (car code) onif-symbol-hash)
                   (let* ((formals (cadr code))
