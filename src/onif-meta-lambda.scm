@@ -9,6 +9,7 @@
            (scheme cxr)
            (onif idebug) (scheme write)
            (only (niyarin thread-syntax) ->> ->)
+           (prefix (kallcc misc) kmisc/)
            (onif misc)
            (onif symbol))
    (export onif-meta-lambda-conv
@@ -76,20 +77,16 @@
        (cond
          ((not-pair? cps-code) cps-code)
          ((%lambda-operator? (car cps-code) onif-symbol-hash)
-          (let* ((new-stk (cons (cadr cps-code) stk))
-                 (new-body;;複数body許容lambda
-                   (map
-                      (lambda (body)
-                        (%conv-meta-lambda
-                          body
-                          onif-symbol-hash
-                          new-stk
-                          onif-expand-env))
-                      (cddr cps-code)))
+          (let* ((new-stk (cons (kmisc/formals->list (cadr cps-code))
+                                stk))
+                 (new-body
+                   (map (lambda (body)
+                           (%conv-meta-lambda body onif-symbol-hash new-stk onif-expand-env))
+                        (cddr cps-code)))
                  (use-symbols
                    (->> new-body
                         (append-map (lambda (x) (if (not (list? x)) (list x) x)))
-                        (filter (lambda (x) (or (symbol? x) (onif-symbol? x))))))
+                        (filter kmisc/var?)))
                  (concatenated-new-stk (concatenate new-stk))
                  (live-vars
                    (->> (concatenate (filter list? new-body))

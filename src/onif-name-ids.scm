@@ -3,7 +3,7 @@
 
 (define-library (onif name-ids)
    (import (scheme base)
-           (scheme cxr)
+           (prefix (kallcc misc) kmisc/)
            (onif misc)
            (onif meta-lambda))
    (export name-ids/make-name-local-ids)
@@ -14,32 +14,23 @@
                   (res '()))
          (if (null? vars)
            res
-           (loop
-             (+ i 1)
-             (cdr vars)
-             (cons (list (car vars) i) res)))))
+           (loop (+ i 1) (cdr vars) (cons (list (car vars) i) res)))))
 
      (define (%add-meta-info-name-local-ids code bind-vars onif-symbol-hash)
       (cond
          ((not (pair? code)) code)
          ((onif-misc/lambda-meta-operator? (car code) onif-symbol-hash)
-          (let* ((bind-vars (append (cadr code) bind-vars))
+          (let* ((bind-vars (append (kmisc/formals->list (cadr code)) bind-vars))
                  (name-ids
                    (%make-name-local-ids bind-vars))
                  (new-body
                    (%add-meta-info-name-local-ids
-                     (cadddr code)
-                     bind-vars
-                     onif-symbol-hash)))
+                     (list-ref code 3) bind-vars onif-symbol-hash)))
                 (onif-meta-lambda/update-meta-info-body
-                  code
-                  'local-ids
-                  name-ids
-                  new-body)))
+                  code 'local-ids name-ids new-body)))
          (else
-           (map
-             (lambda (x)
-                 (%add-meta-info-name-local-ids x bind-vars onif-symbol-hash))
+           (map (lambda (x) (%add-meta-info-name-local-ids x bind-vars
+                                                           onif-symbol-hash))
              code))))
 
      (define (name-ids/make-name-local-ids code onif-symbol-hash)
