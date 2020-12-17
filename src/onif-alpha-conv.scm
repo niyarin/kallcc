@@ -4,6 +4,7 @@
 (define-library (onif alpha conv)
    (import (scheme base)
            (onif symbol)
+           (prefix (kallcc misc) kmisc/)
            (scheme list)
            (srfi 125) ;SCHEME HASH
            (srfi 127)
@@ -32,12 +33,10 @@
            #f
            (lseq-car res))))
 
-     ;memorize
      (define (%symbol-conv symbol stk)
        (cond
          ((%lookup-stack symbol stk)
-          => (lambda (x)
-               (lseq-car (lseq-cdr x))))
+          => cdr)
          (else symbol)))
 
      (define (onif-alpha/simple-conv! code conv-table onif-symbol-hash)
@@ -64,6 +63,22 @@
            ((eq? type 'global) symbol)
            (else (error "!!" sym-info)))))
 
+     (define (%formals->list formals)
+       (let loop ((fs formals))
+         (cond
+           ((pair? fs)
+            (cons (car fs)
+                  (loop (cdr fs))))
+           ((null? fs) '())
+           (else (list fs)))))
+
+     (define (%make-stack-cell formals current-stack)
+       (map (lambda (x)
+               (if (%lookup-stack x current-stack)
+                 (cons x (onif-symbol x))
+                 (cons x x)))
+            (%formals->list formals)))
+
      (define (onif-alpha/conv! code onif-symbol-hash
                                . optional-inital-stack)
        (let ((initial-stk
@@ -77,22 +92,19 @@
              (let loop ((code code)
                         (stk initial-stk))
                (cond
-                 ((symbol? code) (%symbol-conv code stk))
+                 ((kmisc/var? code) (%symbol-conv code stk))
                  ((not (list? code)) code)
                  ((null? code) '())
                  ((onif-misc/ref-var-operator? (car code) onif-symbol-hash) (%alpha-conv-ref-var (cadr code)))
                  ((onif-misc/quote-operator? (car code) onif-symbol-hash) code)
                  ((%lambda-operator? (car code) onif-symbol-hash)
-                  (let* ((formals (cadr code))
-                         (stack-cell
-                             (map (lambda (x)
-                                    (if (%lookup-stack x stk)
-                                       (list x (onif-symbol x))
-                                       (list x x)))
-                                  formals)))
+                  (let ((stack-cell (%make-stack-cell (cadr code) stk)))
                     (begin
                       ;;rename-formal
-                      (set-car! (cdr code) (map cadr stack-cell))
+                      (set-car! (cdr code)
+                                (kmisc/rename-symbol-in-expression
+                                  (cadr code)
+                                  stack-cell))
                       ;;rename body
                       (set-cdr! (cdr code)
                                 (map (lambda (body)
