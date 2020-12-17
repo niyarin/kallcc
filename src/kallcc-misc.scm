@@ -5,7 +5,8 @@
           (onif symbol)
           (prefix (kallcc symbol) ksymbol/))
   (export kerror make-tconc tconc-head tconc-push! scm-expression->symbol-set find-in-expression
-          rename-symbol-in-expression inverse-alist var?)
+          rename-symbol-in-expression inverse-alist var?
+          formals->list list-update)
   (begin
     (define kerror error)
 
@@ -43,8 +44,8 @@
 
     (define (scm-expression->symbol-set expression . symbol-procedure-opt)
       (let ((symbol-procedure (if (not (null? symbol-procedure-opt))
-                                (car symbol-procedure-opt)
-                                var?)))
+                                 (car symbol-procedure-opt)
+                                 var?)))
         (list->set (make-eq-comparator)
                    (find-in-expression expression symbol-procedure))))
 
@@ -61,4 +62,21 @@
           ((and (var? expression)
                 (assq expression alist))
            => cdr)
-          (else expression))))))
+          (else expression))))
+
+    (define (formals->list formals)
+       (let loop ((fs formals))
+         (cond
+           ((pair? fs)
+            (cons (car fs)
+                  (loop (cdr fs))))
+           ((null? fs) '())
+           (else (list fs)))))
+
+    (define (list-update ls index val)
+      (let loop ((i 0)
+                 (ls ls))
+        (if (= i index)
+          (cons val
+                (cdr ls))
+          (cons (car ls) (loop (+ i 1) (cdr ls))))))))

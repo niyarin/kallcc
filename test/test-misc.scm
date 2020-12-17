@@ -41,3 +41,10 @@
      (test-equal (kmisc/rename-symbol-in-expression '(foo x (y 1) (sym y)) '((foo . foo2) (y . z) (sym . w)))
                  '(foo2 x (z 1) (w z))))
    (test-end "test-rename-symbol-in-expression"))
+
+(begin ;;list-update
+   (test-begin "test-list-update")
+   (test-equal (kmisc/list-update '(0 1 2) 0 'a)
+               '(a 1 2))
+   (test-equal (kmisc/list-update '(0 1 2) 1 'b)
+   (test-end "test-list-update"))

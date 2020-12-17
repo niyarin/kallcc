@@ -49,20 +49,12 @@
               `(contain-symbols ,contain-symbols))))
 
      (define (onif-meta-lambda/update-meta-info meta-lambda-code key val)
-        (list
-         (car meta-lambda-code)
-         (cadr meta-lambda-code)
-         (cons
-           (list key val)
-           (caddr meta-lambda-code))
-         (cadddr meta-lambda-code)))
+        (kmisc/list-update meta-lambda-code
+                           2
+                           (cons (list key val) (caddr meta-lambda-code))))
 
      (define (onif-meta-lambda/update-body meta-lambda-code new-body)
-       (list
-         (car meta-lambda-code)
-         (cadr meta-lambda-code)
-         (caddr meta-lambda-code)
-         new-body))
+       (kmisc/list-update meta-lambda-code 3 new-body))
 
      (define (onif-meta-lambda/update-meta-info-body meta-lambda-code key val new-body)
        (list
