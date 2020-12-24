@@ -130,7 +130,7 @@
                         (map (lambda (namespace-expression)
                                (->> (onif-expand/defined-symbols (cddr namespace-expression) symbol-hash)
                                     (map (lambda (sym)
-                                           (list sym (onif-symbol sym))))))))))
+                                           (cons sym (onif-symbol sym))))))))))
           (for-each (lambda (expressions ;namespace
                               renamed-targets)
                       (begin
