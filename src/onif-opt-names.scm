@@ -1,20 +1,16 @@
 (include "./onif-misc.scm")
-(include "./onif-idebug.scm")
 
 (define-library (onif opt names)
-   (import (scheme base) (scheme list) (onif misc) (scheme cxr)
-           (onif idebug) (scheme write))
+   (import (scheme base) (scheme list) (onif misc) (scheme cxr))
    (export onif-opt-names/calc-use-names onif-ope-names/remove-unnecessary-define)
    (begin
      (define (onif-opt-names/calc-use-names cps-meta-code onif-symbol-hash)
        (let* ((res '()))
           (let loop ((code cps-meta-code))
             (cond
-              ((onif-misc/var? code)
-               (set! res (cons code res)))
+              ((onif-misc/var? code) (set! res (cons code res)))
               ((not (pair? code)))
               ((onif-misc/define-operator? (car code) onif-symbol-hash)
-               (display "###############")(onif-idebug/debug-display (cadddr code))(newline)
                (loop (cadddr code)))
               ((onif-misc/lambda-meta-operator? (car code) onif-symbol-hash)
                (for-each loop (cdddr code)))

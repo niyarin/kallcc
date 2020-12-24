@@ -29,9 +29,7 @@
        (let ((res (->> stk
                        (lseq-map (lambda (frame-alist) (assv symbol frame-alist)))
                        (lseq-filter (lambda (x) x)))))
-         (if (null? res)
-           #f
-           (lseq-car res))))
+         (and (not (null? res)) (lseq-car res))))
 
      (define (%symbol-conv symbol stk)
        (cond
@@ -47,14 +45,7 @@
             => cadr)
            ((not-pair? code) code)
            ((onif-misc/quote-operator? (car code) onif-symbol-hash) code)
-           (else
-             (begin
-                (->> code
-                     (onif-misc/for-each-cell1
-                       (lambda (cell)
-                         (set-car! cell
-                                   (loop (car cell))))))
-                code)))))
+           (else (map! (lambda (x) (loop x)) code)))))
 
      (define (%alpha-conv-ref-var sym-info)
        (let ((type (car sym-info))
@@ -63,21 +54,12 @@
            ((eq? type 'global) symbol)
            (else (error "!!" sym-info)))))
 
-     (define (%formals->list formals)
-       (let loop ((fs formals))
-         (cond
-           ((pair? fs)
-            (cons (car fs)
-                  (loop (cdr fs))))
-           ((null? fs) '())
-           (else (list fs)))))
-
      (define (%make-stack-cell formals current-stack)
        (map (lambda (x)
                (if (%lookup-stack x current-stack)
                  (cons x (onif-symbol x))
                  (cons x x)))
-            (%formals->list formals)))
+            (kmisc/formals->list formals)))
 
      (define (onif-alpha/conv! code onif-symbol-hash
                                . optional-inital-stack)
@@ -112,11 +94,8 @@
                                      (cddr code)))
                       code)))
                  (else
-                   (onif-misc/for-each-cell1
-                     (lambda (cell)
-                        (set-car!
-                           cell
-                           (loop (car cell) stk)))
+                   (pair-for-each
+                     (lambda (cell) (set-car!  cell (loop (car cell) stk)))
                      code)
                    code)))
 
