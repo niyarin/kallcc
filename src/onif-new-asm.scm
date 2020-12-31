@@ -74,10 +74,13 @@
                       (%global-ref! var global-ids-box))))))
 
      (define (%safety-register base offset lock-offsets)
+       (display "LOCK!")(display lock-offsets)(display base) (display " ")(display offset)(newline)
        (let loop ((offset offset))
          (if (memq (+ base offset) lock-offsets)
            (loop (+ offset 1))
-           (+ base offset))))
+           (begin
+             (display "=>")(display (+ base offset))(newline)
+             (+ base offset)))))
 
      (define (%n-safety-registers base offset lock-offsets n)
        (let loop ((offset offset)
@@ -107,14 +110,13 @@
                         lock-registers local-register global-ids-box)
          ;;local setの工夫がいりそう(レジスタとenvに変更がいる)
          ;;返り値は順方向
-         (let* ((addr-reg (%safety-register to-register-offset 1 lock-registers))
-                (env-reg (%safety-register to-register-offset 2 (cons addr-reg lock-registers)))
-                (null-reg (%safety-register to-register-offset 3 (cons* env-reg addr-reg lock-registers)))
-                (out-env-reg (%use-registers-ref-env use-registers))
+         (let* ((out-env-reg (%use-registers-ref-env use-registers))
+                (null-reg (%safety-register to-register-offset 1 lock-registers))
                 (env-reg
                   (if (null? out-env-reg)
                     null-reg
                     out-env-reg))
+                (addr-reg (%safety-register to-register-offset 2 (cons* env-reg null-reg lock-registers)))
                 (null-set
                   (if (null? out-env-reg)
                     `((SET! (R ,null-reg) ()))
@@ -125,6 +127,7 @@
                   `((MAKE-CLOSURE (R ,env-reg)
                                   (R ,addr-reg)
                                   (R ,to-register-offset)))))
+            (when (eq? env-reg addr-reg) (error "! SAME ADDR CLS"))
             (append  null-set make-closure-addr make-closure)))
 
 
@@ -473,9 +476,27 @@
 
    (define (%asm-fun-lset id-fun use-registers register-offset lock-registers local-register
                           env global-ids-box jump-box onif-symbol-hash)
-    (let* ((meta-function (cadr id-fun)))
-      (append (%asm-fun-header (car id-fun) (cadr meta-function) (list-ref meta-function 3))
-              )))
+    (let* ((meta-function (cadr id-fun))
+           (body (list-ref meta-function 3)))
+      (let*-values (((free-vars-expand phase1-local-registers phase1-lock-registers phase1-register-shift)
+                       (%asm-fun-free-vars (cadr id-fun) lock-registers onif-symbol-hash))
+                    ((make-env-frame phase2-local-registers phase2-lock-registers phase2-register-shift)
+                     (%asm-fun-make-env-frame (cadr id-fun) phase1-local-registers  phase1-lock-registers)))
+        (let ((another-register
+                 (%safety-register (+ phase1-register-shift
+                                      phase2-register-shift 2)
+                                   0 phase2-lock-registers)))
+            (append (%asm-fun-header (car id-fun) (cadr meta-function) (list-ref meta-function 3))
+                    free-vars-expand
+                    make-env-frame
+                    (list `(CONS (R 0) (R 1) (R ,another-register));そのあたらしいフレームを持ってきた環境にCONS
+                          `(SET! (R 1) (R ,another-register)))
+                    `((COMMENT "SET! LOCAL"))
+                    ;(%asm-arg1 code use-registers to-register-offset
+                    ;          lock-registers local-register global-ids-box
+                    ;          onif-symbol-hash)
+                    `((COMMENT "SET! END"))
+                    )))))
 
    (define (%asm-fun id-fun use-registers register-offset lock-registers local-register
                      env global-ids-box jump-box onif-symbol-hash)
