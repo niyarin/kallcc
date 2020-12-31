@@ -4,18 +4,20 @@
 (include "./lib/thread-syntax.scm")
 (include "./lib/scmspec.scm")
 (include "./onif-syntax-rules.scm")
+(include "./kallcc-util-namespace.scm")
 
 ;TODO:fix import expression
 (define-library (onif expand)
-   (import (scheme base) (scheme cxr) (scheme list)
-           (scheme set)
-           (srfi 125)
+   (import (scheme base)  (scheme list) (scheme set)
+           (scheme hash-table) (scheme comparator)
+           (scheme cxr)
            (onif scm env) (onif misc) (onif symbol)
            (onif syntax-rules)
            (onif idebug)
            (niyarin thread-syntax)
            (prefix (kallcc misc) kmisc/)
            (prefix (kallcc symbol) ksymbol/)
+           (prefix (kallcc util namespace) kunamespace/)
            (scmspec core)
            (scheme write);DEBUG
            )
@@ -89,14 +91,10 @@
          (cadr (%expand-environment-syntax-symbol-hash-ref
                   'if
                   expand-environment))
-         (map
-           (lambda (expression)
-             (onif-expand
-               expression
-               global
-               stack
-               expand-environment))
-           (cdr scm-code))))
+         (map (lambda (expression)
+                 (onif-expand expression global
+                              stack expand-environment))
+              (cdr scm-code))))
 
      (define (%dot-or-list->list formals)
        (let loop ((fmls formals)
@@ -199,15 +197,27 @@
                                   stack expand-environment)
        ;;stackにつっこむのをわすれるな
        ;;synatax-globalを使うこと
-       (let* ((syntax-global (onif-syntax-rules/ref-global srules-object))
-              (syntax-stack  (onif-syntax-rules/ref-stack srules-object))
-              (evacuation-symbol-dict (%expr->symbol-rename-alist
+       (let* ((syntax-stack  (onif-syntax-rules/ref-stack srules-object))
+              ;入力のシンボルを別の名に新しい置き換える(辞書作成)
+              (evacuation-symbol-alist (%expr->symbol-rename-alist
                                         expr kmisc/var?))
+              ;退避リネーム
               (pre-renamed-expr
                 (kmisc/rename-symbol-in-expression expr
-                                            evacuation-symbol-dict))
+                                                   evacuation-symbol-alist))
+              ;マクロ展開
               (macro-expanded
                 (onif-syntax-rules/expand srules-object pre-renamed-expr))
+
+              ;let-syntaxは考慮しない
+              (syntax-global (kunamespace/merge
+                               (onif-syntax-rules/ref-global srules-object)
+                               (alist->hash-table (map (lambda (key-val)
+                                                           (cons (cdr (assq (car key-val) evacuation-symbol-alist))
+                                                                 (cdr key-val)))
+                                                       (kunamespace/filter-keys-alist global (map car evacuation-symbol-alist)))
+                                                  (make-eq-comparator))))
+              ;
               (expanded
                 (onif-expand/expand macro-expanded syntax-global syntax-stack
                                     expand-environment))
@@ -219,70 +229,74 @@
                 (kmisc/rename-symbol-in-expression expanded after-symbol-dict))
               (after-renamed-expr*
                 (kmisc/rename-symbol-in-expression after-renamed-expr
-                                                   (kmisc/inverse-alist evacuation-symbol-dict))))
-        (display "1>>>")(display stack)(newline)
-        (display "2>>>")(onif-idebug/debug-display after-renamed-expr*)(newline)
-        (display "3>>>")(onif-idebug/debug-display after-symbol-dict)(newline)
-        after-renamed-expr*))
+                                                   (kmisc/inverse-alist evacuation-symbol-alist))))
+        ;(display "1>>>")(display stack)(newline)
+        ;(display "2>>>")(onif-idebug/debug-display after-renamed-expr*)(newline)
+        ;;(display "3>>>")(onif-idebug/debug-display after-symbol-dict)(newline)
+        ;(display "1>>>")(onif-idebug/debug-display (hash-table->alist syntax-global))(newline)
+        ;(display "2>>>")(onif-idebug/debug-display macro-expanded)(newline)
+        ;(display "3>>>")(onif-idebug/debug-display expanded)(newline)
+        after-renamed-expr*
+        ))
 
      (define (%list-expand operator scm-code global stack expand-environment)
-        "operator is pair. example. (built-in-lambda . ONIF-SYMBOL)"
-        (scmspec/lcheck ((input (operator (scmspec/pair symbol? scmspec/any?))))
-            (let ((operator-kind (car operator)))
-              (case operator-kind
-                 ((built-in-lambda);LAMBDA
-                  (%list-expand-lambda scm-code global stack expand-environment))
-                 ((built-in-if)
-                  (%list-expand-if scm-code global stack expand-environment))
-                 ((built-in-define)
-                  (%list-expand-define scm-code global stack expand-environment))
-                 ((built-in-set!)
-                  (%list-expand-set! scm-code global stack expand-environment))
-                 ((built-in-quote)
-                     (list (cadr (%expand-environment-syntax-symbol-hash-ref
-                                 'quote
-                                 expand-environment))
-                           (cadr scm-code)))
-                 ((built-in-syntax-error)
-                    (erorr "Syntax error"))
-                 ((built-in-car built-in-cdr built-in-cons built-in-eq?
-                   built-in-vector-set! built-in-make-vector built-in-vector-length built-in-vector-ref
-                   built-in-fx+ built-in-fx- built-in-fx* built-in-fx=?
-                   built-in-fxremainder
-                   built-in-fx<?  built-in-make-bytevector
-                   built-in-bytevector-u8-ref built-in-bytevector-u8-set!
-                   built-in-bytevector-length)
-                  (cons
-                    (cadr operator)
-                    (map (lambda (expression)
-                            (onif-expand
-                              expression global stack expand-environment))
-                        (cdr scm-code))))
-                 ((built-in-define-library)
-                  (%list-expand-define-library
-                    scm-code global stack expand-environment))
-                 ((built-in-define-syntax)
-                     (let ((syntax-object
-                             (onif-expand/make-syntax-object
-                               (list-ref scm-code 2) global stack)))
-                       (hash-table-set! global (cadr scm-code) syntax-object)
-                       #f))
-                 ((built-in-begin)
-                  (%list-expand-begin
-                    scm-code global stack expand-environment))
-                 ((user-syntax)
-                   (%expand-user-syntax scm-code (cadr operator) global
-                                        stack expand-environment))
-                 (else (map (lambda (expression)
-                               (onif-expand expression global
-                                            stack expand-environment))
+       "operator is pair. example. (built-in-lambda . ONIF-SYMBOL)"
+       (scmspec/lcheck ((input (operator (scmspec/pair symbol? scmspec/any?))))
+          (let ((operator-kind (car operator)))
+            (case operator-kind
+               ((built-in-lambda);LAMBDA
+                (%list-expand-lambda scm-code global stack expand-environment))
+               ((built-in-if)
+                (%list-expand-if scm-code global stack expand-environment))
+               ((built-in-define)
+                (%list-expand-define scm-code global stack expand-environment))
+               ((built-in-set!)
+                (%list-expand-set! scm-code global stack expand-environment))
+               ((built-in-quote)
+                   (list (cadr (%expand-environment-syntax-symbol-hash-ref
+                               'quote
+                               expand-environment))
+                         (cadr scm-code)))
+               ((built-in-syntax-error)
+                  (erorr "Syntax error"))
+               ((built-in-car built-in-cdr built-in-cons built-in-eq?
+                 built-in-vector-set! built-in-make-vector built-in-vector-length built-in-vector-ref
+                 built-in-fx+ built-in-fx- built-in-fx* built-in-fx=?
+                 built-in-fxremainder
+                 built-in-fx<?  built-in-make-bytevector
+                 built-in-bytevector-u8-ref built-in-bytevector-u8-set!
+                 built-in-bytevector-length)
+                (cons
+                  (cadr operator)
+                  (map (lambda (expression)
+                          (onif-expand
+                            expression global stack expand-environment))
+                      (cdr scm-code))))
+               ((built-in-define-library)
+                (%list-expand-define-library
+                  scm-code global stack expand-environment))
+               ((built-in-define-syntax)
+                   (let ((syntax-object
+                           (onif-expand/make-syntax-object
+                             (list-ref scm-code 2) global stack)))
+                     (hash-table-set! global (cadr scm-code) syntax-object)
+                     #f))
+               ((built-in-begin)
+                (%list-expand-begin
+                  scm-code global stack expand-environment))
+               ((user-syntax)
+                 (%expand-user-syntax scm-code (cadr operator) global
+                                      stack expand-environment))
+               (else (map (lambda (expression)
+                             (onif-expand/expand expression global
+                                          stack expand-environment))
                      scm-code))))))
 
      (define (onif-expand/expand scm-code global stack expand-environment)
         "global is scheme hash."
-         (cond
+        (cond
            ;((symbol? scm-code) (%lookup-environment scm-code global stack))
-           ((and (pair? scm-code) (symbol? (car scm-code)))
+           ((and (pair? scm-code) (kmisc/var? (car scm-code)))
             (let ((operator (%lookup-environment (car scm-code) global stack)))
                (%list-expand operator scm-code global stack expand-environment)))
            ((and (pair? scm-code) (list? (car scm-code)))
@@ -318,9 +332,9 @@
                        namespaces))))
 
      (define (onif-expand/import-expression? expression global)
-         (and (pair? expression)
-              (let ((ope (%lookup-environment (car expression) global '())))
-                (and (pair? ope) (eq? 'built-in-import (car ope))))))
+       (and (pair? expression)
+            (let ((ope (%lookup-environment (car expression) global '())))
+              (and (pair? ope) (eq? 'built-in-import (car ope))))))
 
       (define (onif-expand/export-expression? expression global)
          (and (pair? expression)
@@ -381,7 +395,7 @@
                         (let ((exported-global (%namespace->export-global namespace)))
                           (hash-table-merge! env exported-global))))
                   (else env)))
-              (make-hash-table eq?)
+              (make-hash-table (make-eq-comparator))
               lib-names))
 
      (define (onif-expand/make-syntax-object syntax global stack)
