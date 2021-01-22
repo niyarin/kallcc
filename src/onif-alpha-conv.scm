@@ -1,5 +1,3 @@
-(include "./onif-symbol.scm")
-(include "./lib/thread-syntax.scm")
 
 (define-library (onif alpha conv)
    (import (scheme base)
@@ -28,7 +26,7 @@
      (define (%lookup-stack symbol stk)
        (let ((res (->> stk
                        (lseq-map (lambda (frame-alist) (assv symbol frame-alist)))
-                       (lseq-filter (lambda (x) x)))))
+                       (lseq-filter values))))
          (and (not (null? res)) (lseq-car res))))
 
      (define (%symbol-conv symbol stk)

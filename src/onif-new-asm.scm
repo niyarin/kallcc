@@ -1,12 +1,9 @@
-(include "./onif-misc.scm")
-(include "./onif-idebug.scm")
-(include "./onif-symbol.scm")
-(include "./lib/thread-syntax.scm")
-
 (define-library (onif new-asm)
    (import (scheme base) (scheme cxr) (scheme list) (scheme sort)
+           (scheme vector)
            (onif idebug) (onif symbol) (onif misc)
            (only (niyarin thread-syntax) ->> ->)
+           (prefix (kallcc misc) kmisc/)
            (scheme write);
            )
    (export onif-new-asm/make-global-ids-box onif-new-asm/convert onif-new-asm/tune
@@ -74,13 +71,10 @@
                       (%global-ref! var global-ids-box))))))
 
      (define (%safety-register base offset lock-offsets)
-       (display "LOCK!")(display lock-offsets)(display base) (display " ")(display offset)(newline)
        (let loop ((offset offset))
          (if (memq (+ base offset) lock-offsets)
            (loop (+ offset 1))
-           (begin
-             (display "=>")(display (+ base offset))(newline)
-             (+ base offset)))))
+           (+ base offset))))
 
      (define (%n-safety-registers base offset lock-offsets n)
        (let loop ((offset offset)
@@ -108,28 +102,27 @@
 
      (define (%asm-lfun code use-registers to-register-offset
                         lock-registers local-register global-ids-box)
-         ;;local setの工夫がいりそう(レジスタとenvに変更がいる)
-         ;;返り値は順方向
-         (let* ((out-env-reg (%use-registers-ref-env use-registers))
-                (null-reg (%safety-register to-register-offset 1 lock-registers))
-                (env-reg
-                  (if (null? out-env-reg)
-                    null-reg
-                    out-env-reg))
-                (addr-reg (%safety-register to-register-offset 2 (cons* env-reg null-reg lock-registers)))
-                (null-set
-                  (if (null? out-env-reg)
-                    `((SET! (R ,null-reg) ()))
-                    '()))
-                (make-closure-addr
-                 `((SET! (R ,addr-reg) (M2 ,(%make-symbol "FUN" (cadr code))))))
-                (make-closure
-                  `((MAKE-CLOSURE (R ,env-reg)
-                                  (R ,addr-reg)
-                                  (R ,to-register-offset)))))
-            (when (eq? env-reg addr-reg) (error "! SAME ADDR CLS"))
-            (append  null-set make-closure-addr make-closure)))
-
+       ;;local setの工夫がいりそう(レジスタとenvに変更がいる)
+       ;;返り値は順方向
+       (let* ((out-env-reg (%use-registers-ref-env use-registers))
+              (null-reg (%safety-register to-register-offset 1 lock-registers))
+              (env-reg
+                (if (null? out-env-reg)
+                  null-reg
+                  out-env-reg))
+              (addr-reg (%safety-register to-register-offset 2 (cons* env-reg null-reg lock-registers)))
+              (null-set
+                (if (null? out-env-reg)
+                  `((SET! (R ,null-reg) ()))
+                  '()))
+              (make-closure-addr
+               `((SET! (R ,addr-reg) (M2 ,(%make-symbol "FUN" (cadr code))))))
+              (make-closure
+                `((MAKE-CLOSURE (R ,env-reg)
+                                (R ,addr-reg)
+                                (R ,to-register-offset)))))
+          (when (eq? env-reg addr-reg) (error "! SAME ADDR CLS"))
+          (append  null-set make-closure-addr make-closure)))
 
      (define (%asm-byte-vector bv to-register-offset lock-registers)
        ;;外側という前提
@@ -149,6 +142,37 @@
                           `(SET! (R ,r2) ,i)
                           res))
              (reverse res)))))
+
+      (define (%asm-const-object object register-number)
+        ;;こーるすたっくつかうならtconcいらなかった
+        ;;あとで、レジスタ番号を決めるためにロックを使う
+        (let ((tconc (kmisc/make-tconc)))
+          (let loop ((object object)
+                     (reg register-number)
+                     (tconc tconc))
+            (cond
+              ((and (vector? object) (vector-every integer? object))
+               (kmisc/tconc-push! tconc `(VECTOR ,(vector-length object) (R ,reg)))
+               (let loop ((i 0))
+                 (when (< i (vector-length object))
+                   (kmisc/tconc-push! tconc `(VECTOR-SET-INIT! (R ,reg) ,i ,(vector-ref object i)))
+                   (loop (+ i 1)))))
+              ((vector? object)
+               (kmisc/tconc-push! tconc `(VECTOR ,(vector-length object) (R ,reg)))
+               (for-each
+                 (lambda (i)
+                   (let ((tgt-reg (+ reg 1)))
+                     (loop (vector-ref object i) tgt-reg tconc)
+                    (kmisc/tconc-push! tconc `(VECTOR-SET! (R ,reg) ,i (R ,tgt-reg)))))
+                 (iota (vector-length object))))
+              ((bytevector? object)
+               (kmisc/tconc-push! tconc `(BYTEVECTOR ,(bytevector-length object) (R ,reg)))
+               (let loop ((i 0))
+                 (when (< i (bytevector-length object))
+                   (kmisc/tconc-push! tconc `(BYTEVECTOR-U8-SET! (R ,reg) ,i ,(bytevector-u8-ref object i)))
+                   (loop (+ i 1)))))
+              (else (error "TBW" object))))
+        (kmisc/tconc-head tconc)))
 
      (define (%asm-arg1 code use-registers to-register-offset
                         lock-registers local-register global-ids-box
@@ -191,24 +215,33 @@
                           lock-registers local-register global-ids-box onif-symbol-hash)
        (let ((global (%global-ref! (caddr code) global-ids-box))
              (continuation (cadr code)))
-         (if (and (null? continuation) (null? local-register))
-           (let ((body (%asm-arg1 (cadddr code) use-registers register-offset
-                                  lock-registers local-register global-ids-box onif-symbol-hash)))
-           `(,@body
-              (SET! ,global (R ,register-offset))
-              (CONCATENATE-BODY)))
+         (cond
+           ((and (null? continuation)
+                 (null? local-register)
+                 (or (vector? (list-ref code 3)) (bytevector? (list-ref code 3))));;まだ、quoteは見ないことにする
+            (let ((body (%asm-const-object (list-ref code 3) register-offset)))
+               `(,@body
+                (SET! ,global (R ,register-offset))
+                (CONCATENATE-BODY))))
+           ((and (null? continuation) (null? local-register))
+             (let ((body (%asm-arg1 (cadddr code) use-registers register-offset
+                                    lock-registers local-register global-ids-box onif-symbol-hash)))
+             `(,@body
+                (SET! ,global (R ,register-offset))
+                (CONCATENATE-BODY))))
            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;lockレジスターが完全でない
-           (let* ((r0 (%safety-register register-offset 0 lock-registers))
-                  (r1 (%safety-register register-offset 0 (cons r0 lock-registers)))
-                  (cont-arg (%asm-arg1 (cadr code) use-registers r0
-                                      lock-registers local-register global-ids-box onif-symbol-hash))
-                  (body-arg (%asm-arg1 (cadddr code) use-registers r1
-                                      lock-registers local-register global-ids-box onif-symbol-hash)))
-             `(,@cont-arg
-               ,@body-arg
-                (SET! ,global (R ,r1))
-                ;(SET! (R 0) ())
-                (CALL 1))))))
+           (else
+             (let* ((r0 (%safety-register register-offset 0 lock-registers))
+                    (r1 (%safety-register register-offset 0 (cons r0 lock-registers)))
+                    (cont-arg (%asm-arg1 (cadr code) use-registers r0
+                                         lock-registers local-register global-ids-box onif-symbol-hash))
+                    (body-arg (%asm-arg1 (cadddr code) use-registers r1
+                                         lock-registers local-register global-ids-box onif-symbol-hash)))
+               `(,@cont-arg
+                 ,@body-arg
+                  (SET! ,global (R ,r1))
+                  ;(SET! (R 0) ())
+                  (CALL 1)))))))
 
      (define (%asm-if code register-offset use-registers
                       lock-registers local-register jump-box env global-ids-box onif-symbol-hash)
@@ -238,8 +271,7 @@
                (r1 (%safety-register register-offset 0 (cons cont lock-registers)))
                (r2 (%safety-register register-offset 0 (cons* cont r1 lock-registers)))
                (r3 (%safety-register register-offset
-                                     0
-                                     (cons* cont r1 r2 lock-registers))))
+                                     0 (cons* cont r1 r2 lock-registers))))
           (case ope
             ((CONS)
              `(,@args
@@ -259,7 +291,7 @@
                  (,ope (R ,r1)
                        (R ,r2)
                        (R ,r3))))
-            ((FX+ FX- FX* FX<? FX=? FXREMAINDER)
+            ((FX+ FX- FX* FX<? FX=? FXREMAINDER FXQUOTIENT)
              `(,@args
                (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
                (,ope (R ,r1)
@@ -273,7 +305,7 @@
              (if (integer? (caddr code))
                `(,@args
                  (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
-                 (VECTOR ,(caddr code)) (R ,r1))
+                 (VECTOR ,(caddr code) (R ,r1)))
                `(,@args
                  (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
                  (VECTOR (R ,r1) (R ,r2))
@@ -284,12 +316,26 @@
             `(,@args
                (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
                (VECTOR-SET! (R ,r1) (R ,r2) (R ,r3))))
-            ((MAKE-BYTEVECTOR)
+            ((VECTOR-LENGTH)
              `(,@args
                (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
-               (BYTEVECTOR ,(caddr code)
-                           (R ,r1)
-                           (R ,r2))))
+               (VECTOR-LENGTH (R ,r1) (R ,r2))
+               (SET! (R ,r1) (R ,r2))))
+            ((VECTOR-REF)
+              `(,@args
+               (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
+               (VECTOR-REF (R ,r1) (R ,r2) (R ,r3))
+               (SET! (R ,r1) (R ,r3))))
+            ((MAKE-BYTEVECTOR)
+             (if (integer? (caddr code))
+               `(,@args
+                 (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
+                 (BYTEVECTOR ,(caddr code) (R ,r1)))
+               `(,@args
+                 (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
+                 (BYTEVECTOR (R ,r1)
+                             (R ,r2))
+                 (SET! (R ,r1) (R ,r2)))))
             ((BYTEVECTOR-U8-REF)
              `(,@args
                 (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
@@ -360,16 +406,18 @@
          ((onif-misc/const? body) '())
          ((onif-misc/var? body) (list body))
          ((onif-misc/if-operator? (car body) onif-symbol-hash)
-          (->> (append (caddr body) (cadddr body))
-               (cons (cadr body))
+          (->> (cdr body)
+               (map (lambda (e) (if (pair? e) e (list e))))
+               concatenate
                (filter onif-misc/var?)))
          ((onif-misc/ref-operations (car body) onif-symbol-hash)
           (filter onif-misc/var? (cdr body)))
          (else (filter onif-misc/var? body)))))
 
    (define (%%ref-use-free-vars body frame stack onif-symbol-hash)
-      (let* ((use-vars (%ref-use-vars body onif-symbol-hash))
-             (use-vars (lset-difference eq? use-vars frame)))
+      (let ((use-vars
+              (lset-difference eq?
+                               (%ref-use-vars body onif-symbol-hash) frame)))
          (filter-map
            (lambda (var)
                 (->> (filter-map
@@ -392,8 +440,6 @@
                     free-vars)))
 
    (define (%gen-free-vars-expand free-vars tmp-register register-map stack-for-debug)
-     (display "!!!!!!!!!!!!!")(onif-idebug/debug-display  register-map)(newline)
-     (display "????????????????")(onif-idebug/debug-display (map car free-vars))(newline)
       ;tmp-register
       (let loop ((ls free-vars);((<onif-symbol> <integer> <integer>) ...)
                  (current-stack-cell 0)

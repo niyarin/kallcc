@@ -5,4 +5,5 @@
     (define-syntax let;simple
       (syntax-rules ()
         ((let ((variable init) ...) bodies ...)
-         ((lambda (variable ...) bodies ...) init ...))))))
+         ((lambda (variable ...) bodies ...) init ...))))
+    ))

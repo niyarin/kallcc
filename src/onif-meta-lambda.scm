@@ -1,8 +1,3 @@
-(include "./onif-symbol.scm")
-(include "./onif-idebug.scm")
-(include "./onif-misc.scm")
-(include "./lib/thread-syntax.scm")
-
 (define-library (onif meta-lambda)
    (import (scheme base)
            (scheme list);SRFI 1

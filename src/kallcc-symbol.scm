@@ -4,5 +4,4 @@
    (export kallcc-symbol kallcc-symbol?)
    (begin
      (define kallcc-symbol onif-symbol)
-     ;(define kallcc-symbol? onif-symbol?)
-     (define kallcc-symbol? (lambda (x) onif-symbol? x))))
+     (define kallcc-symbol? onif-symbol?)))

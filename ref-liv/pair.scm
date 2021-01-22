@@ -1,4 +1,4 @@
-(define-library (onif-lib pair)
+(define-library (kallcc-core pair)
    (import (onif-lib core))
    (export caar cadr cdar cddr null?)
    (begin

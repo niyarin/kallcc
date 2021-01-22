@@ -1,7 +1,3 @@
-(include "./onif-opt-names.scm")
-(include "./lib/thread-syntax.scm")
-(include "./onif-idebug.scm")
-
 (define-library (onif opt phases)
    (import (scheme base) (onif opt names)
            (onif idebug) (scheme write)

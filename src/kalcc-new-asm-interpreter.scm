@@ -3,9 +3,15 @@
           (scheme write)
           (scheme list)
           (scheme process-context)
-          )
+          (prefix (kallcc misc) kmisc/)
+          (onif idebug))
   (export run-interpreter)
   (begin
+    (define my-display
+      (lambda (x)
+        (if (and (vector? x) (eq? (vector-ref x 0) 'CLOSURE))
+           'CLOSURE!!!!
+          x)))
 
     (define (%search-next-code code)
       (let loop ((code code))
@@ -15,7 +21,7 @@
           ((eq? (caar code) 'BODY-START) code)
           (else (loop (cdr code))))))
 
-    (define (%ref addr funs registers global)
+    '(define (%ref addr funs registers global)
       (cond
         ((not-pair? addr) addr)
         ((eq? (car addr) 'R) (vector-ref registers (cadr addr)))
@@ -26,6 +32,24 @@
            ((assq (cadr addr) global) => cdr)
            (else (error "UNDEF GLOBAL VAR!\n"))))
         (else (error "?" addr))))
+
+    (define %ref #f)
+    (define (%make-ref-function! global-debug-alist)
+      (set! %ref
+        (lambda (addr funs registers global)
+          (cond
+            ((not-pair? addr) addr)
+            ((eq? (car addr) 'R) (vector-ref registers (cadr addr)))
+            ((eq? (car addr) 'M2)
+             (cond ((assq (cadr addr) funs) => cdr) (else (error "ERROR" addr))))
+            ((eq? (car addr) 'G)
+             (cond
+               ((assq (cadr addr) global) => cdr)
+               (else
+                 (onif-idebug/debug-display global-debug-alist)(newline)
+                 (error "UNDEF GLOBAL VAR!\n"
+                        (onif-idebug-icode->code (kmisc/rassq (cadr addr) global-debug-alist))))))
+            (else (error "?" addr))))))
 
     (define (%set! addr val funs-box registers global-box)
       (cond
@@ -46,7 +70,7 @@
            (cdr code))
           (else (loop (cdr code))))))
 
-    (define (%apply code funs-box registers global-box bp-box)
+    (define (%apply code funs-box registers global-box bp-box global-id-alist)
       (case (caar code)
         ((DEFUN)
          (let ((funs (car funs-box)))
@@ -79,7 +103,7 @@
             (%set! a2 vec funs-box registers global-box))
          (cdr code))
         ((BYTEVECTOR)
-          (let* ((a1 (cadr (car code)))
+          (let* ((a1 (%ref (cadr (car code)) (car funs-box) registers (car global-box)))
                  (a2 (list-ref (car code) 2))
                  (bv (make-bytevector a1)))
             (%set! a2 bv funs-box registers global-box))
@@ -109,9 +133,19 @@
         ((VECTOR-REF)
          (let* ((a1 (cadr (car code)))
                 (a2 (list-ref (car code) 2))
-                (a3 (list-ref (car code) 3)))
+                (a3 (list-ref (car code) 3))
+                (vec (%ref a1 (car funs-box) registers (car global-box)))
+                (index (%ref a2 (car funs-box) registers (car global-box))))
+
+          (unless (eq? (vector-ref vec 0) 'VECTOR)
+
+                  (display 
+          (vector-map
+            (lambda (x)  (my-display x))
+            registers))(newline)
+                  (error "INVALID VECTOR!"))
             (%set! a3
-                   (vector-ref (%ref a1 (car funs-box) registers (car global-box)) (+ a2 1))
+                   (vector-ref  vec (+ index 1))
                    funs-box registers global-box))
          (cdr code))
         ((VECTOR-SET-INIT! VECTOR-SET!)
@@ -119,8 +153,17 @@
                 (a2 (list-ref (car code) 2))
                 (a3 (list-ref (car code) 3))
                 (vec (%ref a1 (car funs-box) registers (car global-box))))
+          (unless (eq? (vector-ref vec 0) 'VECTOR)(error "INVALID VECTOR!"))
           (vector-set! vec (+ (%ref a2 (car funs-box) registers (car global-box)) 1) (%ref a3 (car funs-box) registers (car global-box))))
          (cdr code))
+        ((VECTOR-LENGTH)
+         (let* ((a1 (cadr (car code)))
+                (a2 (list-ref (car code) 2)))
+            (%set! a2
+                   (- (vector-length (%ref a1 (car funs-box) registers (car global-box))) 1)
+                   funs-box registers global-box))
+         (cdr code))
+        ((HALT) '())
         ((BYTEVECTOR-U8-SET!)
          (let* ((a1 (cadr (car code)))
                 (a2 (list-ref (car code) 2))
@@ -156,6 +199,15 @@
                    (%ref a2 (car funs-box) registers (car global-box)))
                    funs-box registers global-box))
          (cdr code))
+      ((FX=?)
+         (let* ((a1 (cadr (car code)))
+                (a2 (list-ref (car code) 2))
+                (a3 (list-ref (car code) 3)))
+          (%set! a3
+                (= (%ref a1 (car funs-box) registers (car global-box))
+                   (%ref a2 (car funs-box) registers (car global-box)))
+                   funs-box registers global-box))
+         (cdr code))
       ((FX*)
          (let* ((a1 (cadr (car code)))
                 (a2 (list-ref (car code) 2))
@@ -173,6 +225,15 @@
                 (+ (%ref a1 (car funs-box) registers (car global-box))
                    (%ref a2 (car funs-box) registers (car global-box)))
                    funs-box registers global-box))
+         (cdr code))
+      ((FXQUOTIENT)
+         (let* ((a1 (cadr (car code)))
+                (a2 (list-ref (car code) 2))
+                (a3 (list-ref (car code) 3)))
+          (%set! a3
+                (quotient (%ref a1 (car funs-box) registers (car global-box))
+                        (%ref a2 (car funs-box) registers (car global-box)))
+               funs-box registers global-box))
          (cdr code))
       ((FXREMAINDER)
          (let* ((a1 (cadr (car code)))
@@ -192,6 +253,7 @@
             (cdr code))))
         ((BODY-START)
          (set-car! bp-box (%search-next-code (cdr code)))
+         (display (car bp-box))(newline)
          (cdr code))
         ((CALL)
          (unless (or (null? (vector-ref registers 0))
@@ -202,14 +264,16 @@
         ((COMMENT) (cdr code))
         (else (display "!")(display (car code))(newline) (exit))))
 
-    (define (run-interpreter code)
+    (define (run-interpreter code global-id-alist)
+      (%make-ref-function! global-id-alist)
       (let ((funs-box (list '()))
             (global-box (list '()))
-            (registers (make-vector 256)))
+            (registers (make-vector 256))
+            (bp-box (list '())))
         (let loop ((code code))
           (unless (null? code)
-            (display (car code))(newline)
-            (loop (%apply code funs-box registers global-box (list '())))))
+            ;(display (car code))(newline)
+            (loop (%apply code funs-box registers global-box bp-box global-id-alist))))
 
         (display "RES = ")(display (vector-ref registers 2))(newline)
         ))))

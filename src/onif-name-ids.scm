@@ -1,6 +1,3 @@
-(include "./onif-meta-lambda.scm")
-(include "./onif-misc.scm")
-
 (define-library (onif name-ids)
    (import (scheme base)
            (scheme list)

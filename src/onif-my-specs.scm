@@ -1,5 +1,3 @@
-(include "./lib/scmspec.scm")
-
 (define-library (onif my-specs)
    (import (scheme base)
            (scmspec core))

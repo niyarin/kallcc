@@ -1,19 +1,3 @@
-(include "./onif-symbol.scm")
-(include "./kallcc-symbol.scm")
-(include "./kallcc-misc.scm")
-(include "./onif-expand.scm")
-(include "./lib/thread-syntax.scm")
-(include "./onif-idebug.scm")
-(include "./onif-scm-env.scm")
-(include "./onif-cps.scm")
-(include "./onif-meta-lambda.scm")
-(include "./onif-flat-lambda.scm")
-(include "./onif-name-ids.scm")
-(include "./onif-alpha-conv.scm")
-(include "./onif-new-asm.scm")
-(include "./onif-opt-names.scm")
-(include "./onif-my-specs.scm")
-(include "./kallcc-namespace.scm")
 
 (define-library (onif phases)
    (import (scheme base) (scheme list) (scheme cxr) (srfi 69);scheme hash
@@ -30,7 +14,8 @@
            onif-phases/alpha-conv! onif-phases/first-stage
            onif-phase/meta-lambda onif-phase/make-name-local-ids
            onif-phase/flat-lambda onif-phases/cps-conv onif-phase/asm
-           onif-phase/new-asm)
+           onif-phase/new-asm
+           onif-phase/new-asm&global)
    (begin
      (define (onif-phases/pre-expand code global)
        "Removes global begin and splites source code based on namespace."
@@ -319,7 +304,21 @@
                   (bodies (%new-asm-body rnamespaces global-ids-box jump-box))
                   (_ (begin (onif-idebug/debug-display (concatenate bodies))(newline)))
                   (funs (%new-asm-funs rnamespaces global-ids-box jump-box)))
+               (display "!XYZ ")(onif-idebug/debug-display global-ids-box)(newline)
                (append
                  funs
                  (concatenate bodies)
-                 '((BODY-START) (HALT)))))))
+                 '((BODY-START) (HALT)))))
+       (define (onif-phase/new-asm&global namespaces)
+           (let* ((rnamespaces (reverse namespaces))
+                  (global-ids-box (onif-new-asm/make-global-ids-box))
+                  (jump-box (list 0))
+                  (bodies (%new-asm-body rnamespaces global-ids-box jump-box))
+                  (_ (begin (onif-idebug/debug-display (concatenate bodies))(newline)))
+                  (funs (%new-asm-funs rnamespaces global-ids-box jump-box)))
+            (values
+               (append
+                 funs
+                 (concatenate bodies)
+                 '((BODY-START) (HALT)))
+               (car global-ids-box))))))

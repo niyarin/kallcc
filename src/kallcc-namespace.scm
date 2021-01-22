@@ -1,3 +1,5 @@
+;;libraryに改名したい.
+
 (define-library (kallcc namespace)
   (import (scheme base) (scheme list))
   (export namespace? nassq body)

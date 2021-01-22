@@ -6,7 +6,7 @@
           (prefix (kallcc symbol) ksymbol/))
   (export kerror make-tconc tconc-head tconc-push! scm-expression->symbol-set find-in-expression
           rename-symbol-in-expression inverse-alist var?
-          formals->list list-update)
+          formals->list list-update rassq)
   (begin
     (define kerror error)
 
@@ -34,6 +34,7 @@
        (%tconc-set-tail! tconc (cdr (%tconc-tail tconc))))
 
     (define (find-in-expression expression proc)
+      ;;木から述語を満たすものを取り出す
       (let loop ((expression expression))
         (cond
           ((proc expression) (list expression))
@@ -79,4 +80,11 @@
         (if (= i index)
           (cons val
                 (cdr ls))
-          (cons (car ls) (loop (+ i 1) (cdr ls))))))))
+          (cons (car ls) (loop (+ i 1) (cdr ls))))))
+
+    (define (rassq val als);;cadr
+      (let loop ((als als))
+        (cond
+          ((null? als) #f)
+          ((eq? (cadr (car als)) val) (car als))
+          (else (loop (cdr als))))))))

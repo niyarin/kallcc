@@ -1,7 +1,3 @@
-(include "./onif-symbol.scm")
-(include "./onif-misc.scm")
-(include "./onif-idebug.scm")
-
 "
 This phase rules.
 <expression>:<lambda-expression>|<begin-expression>|<const-val>

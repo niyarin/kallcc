@@ -1,11 +1,3 @@
-(include "./onif-symbol.scm")
-(include "./onif-scm-env.scm");
-(include "./onif-misc.scm");
-(include "./lib/thread-syntax.scm")
-(include "./lib/scmspec.scm")
-(include "./onif-syntax-rules.scm")
-(include "./kallcc-util-namespace.scm")
-
 ;TODO:fix import expression
 (define-library (onif expand)
    (import (scheme base)  (scheme list) (scheme set)
@@ -258,10 +250,11 @@
                                expand-environment))
                          (cadr scm-code)))
                ((built-in-syntax-error)
-                  (erorr "Syntax error"))
+                (onif-idebug/debug-display scm-code)(newline)
+                  (error "Syntax error" scm-code))
                ((built-in-car built-in-cdr built-in-cons built-in-eq?
                  built-in-vector-set! built-in-make-vector built-in-vector-length built-in-vector-ref
-                 built-in-fx+ built-in-fx- built-in-fx* built-in-fx=?
+                 built-in-fx+ built-in-fx- built-in-fx* built-in-fx=? built-in-fxquotient
                  built-in-fxremainder
                  built-in-fx<?  built-in-make-bytevector
                  built-in-bytevector-u8-ref built-in-bytevector-u8-set!

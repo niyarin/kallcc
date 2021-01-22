@@ -1,6 +1,3 @@
-(include "./onif-misc.scm")
-(include "./lib/thread-syntax.scm")
-
 (define-library (onif flat-lambda)
    (import (scheme base)
            (scheme cxr)

@@ -1,4 +1,3 @@
-(include "./lib/rules.scm")
 
 (define-library (onif syntax-rules)
    (import (scheme base)
@@ -24,8 +23,10 @@
       (define (onif-syntax-rules/expand rules-object input)
         ;;NOT HYGENIC!
         (let loop ((rules (%rules rules-object)))
+          (if (null? rules)
+           `(syntax-error ,input)
            (let ((m (rules/match (%ellipsis rules-object)
                                  (%literals rules-object)
                                  (caar rules)
                                  input)))
-             (if m (rules/expand (cadr (car rules)) m) (loop (cdr rules))))))))
+             (if m (rules/expand (cadr (car rules)) m) (loop (cdr rules)))))))))

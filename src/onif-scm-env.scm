@@ -1,15 +1,8 @@
-(include "./onif-symbol.scm")
-
 (define-library (onif scm env)
-   (cond-expand
-     ((library (srfi 125))
-         (import (scheme base)
-                 (srfi 125)
-                 (onif symbol)))
-     ((library (scheme hash-table))
-         (import (scheme base)
-                 (scheme hash-table)
-                 (onif symbol))))
+   (import (scheme base)
+           (scheme hash-table)
+           (scheme comparator)
+           (onif symbol))
 
    (export onif-scm-env-tiny-core;;remove
            onif-scm-env/tiny-core
@@ -82,6 +75,7 @@
                     (assq symbol tiny-core))
                   '(import export begin))
              eq?)))
-     (define (onif-scm-env/tiny-core) (alist->hash-table (%scm-env-tiny-core) eq?))
+
+     (define (onif-scm-env/tiny-core) (alist->hash-table (%scm-env-tiny-core) (make-eq-comparator)))
 
      (define onif-scm-env-tiny-core onif-scm-env/tiny-core)))

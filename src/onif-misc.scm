@@ -1,6 +1,3 @@
-(include "./onif-symbol.scm")
-(include "./onif-idebug.scm")
-
 (define-library (onif misc)
    (import (scheme base)
            (scheme list)
@@ -84,8 +81,8 @@
        (if (not (onif-symbol? operator))
          #f
          (case (onif-symbol/ref-symbol operator)
-            ((CONS CAR CDR PAIR? SET-CAR! SET-CDR! FX+ FX- FX* FX=? FX<? EQ? FXREMAINDER
-              MAKE-VECTOR VECTOR-SET!
+            ((CONS CAR CDR PAIR? SET-CAR! SET-CDR! FX+ FX- FX* FX=? FX<? EQ? FXREMAINDER FXQUOTIENT
+              MAKE-VECTOR VECTOR-SET! VECTOR-LENGTH VECTOR-REF
               BYTEVECTOR-U8-REF BYTEVECTOR-U8-SET! MAKE-BYTEVECTOR BYTEVECTOR-LENGTH)
              => (lambda (x) x))
             (else #f))))
@@ -100,11 +97,7 @@
        (set-cdr! (cdr ft-pair) (list x))
        (set-cdr! ft-pair (cddr ft-pair)))
 
-     (define (onif-misc/for-each-cell1 fn ls)
-       (let loop ((cell ls))
-         (when (pair? cell)
-            (fn cell)
-            (loop (cdr cell)))))
+     (define onif-misc/for-each-cell1 pair-for-each)
 
     (define (onif-misc/map-indexed f ls)
       (let ((res-cell (onif-misc/ft-pair)))
