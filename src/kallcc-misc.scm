@@ -2,11 +2,12 @@
   (import (scheme base)
           (scheme comparator)
           (scheme set)
+          (scheme hash-table)
           (onif symbol)
           (prefix (kallcc symbol) ksymbol/))
   (export kerror make-tconc tconc-head tconc-push! scm-expression->symbol-set find-in-expression
           rename-symbol-in-expression inverse-alist var?
-          formals->list list-update rassq)
+          formals->list list-update rassq assq-cdr-default assq-cadr-default)
   (begin
     (define kerror error)
 
@@ -87,4 +88,10 @@
         (cond
           ((null? als) #f)
           ((eq? (cadr (car als)) val) (car als))
-          (else (loop (cdr als))))))))
+          (else (loop (cdr als))))))
+
+    (define (assq-cdr-default key alist default)
+      (cond ((assq key alist) => cdr) (else default)))
+
+    (define (assq-cadr-default key alist default)
+      (cond ((assq key alist) => cdr) (else default)))))
