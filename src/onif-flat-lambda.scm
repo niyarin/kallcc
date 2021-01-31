@@ -5,7 +5,7 @@
            (only (scheme list) filter remove not-pair?)
            (srfi 125);scheme hash
            (scheme write);;;
-           (onif meta-lambda)
+           (prefix (kallcc meta-lambda) kmlambda/)
            (only (niyarin thread-syntax) ->> ->)
            (onif misc)
            (onif symbol))
@@ -57,7 +57,7 @@
                        ((assq 'frame prev-info) => cadr)
                        (else '())))
                    (new-lambda
-                     (onif-meta-lambda/update-meta-info-body
+                     (kmlambda/update-meta-info-body
                        code
                        'current-closure-vars
                        contain-symbols
@@ -74,14 +74,14 @@
                     contain-symbols
                     last-frame))))
          (else
-           (->> code
-                (map (lambda (x)
-                         (%flat-conv x
-                                     lambdas-box
-                                     prev-info
-                                     offset-box
-                                     symbol-hash
-                                     expand-environment)))))))
+            (map (lambda (x)
+                     (%flat-conv x
+                                 lambdas-box
+                                 prev-info
+                                 offset-box
+                                 symbol-hash
+                                 expand-environment))
+                 code))))
 
      (define (onif-flat-flat-code&id-lambdas
                code
@@ -97,6 +97,4 @@
                            (list lambda-id-offset)
                            syntax-symbol-hash
                            expand-environment)))
-         (values
-           flat-code
-            (car lambdas-box))))))
+         (values flat-code (car lambdas-box))))))

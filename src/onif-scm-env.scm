@@ -64,8 +64,11 @@
                        (make-bytevector . (built-in-make-bytevector ,(onif-symbol 'MAKE-BYTEVECTOR)))
                        (bytevector-length . (built-in-bytevector-length ,(onif-symbol 'BYTEVECTOR-LENGTH)))
 
+                       ;;internal operations
                        (DEFUN . (internal-defun-operator ,(onif-symbol 'DEFUN-INTERNAL)))
-                       (LFUN . (internal-lfun-operator ,(onif-symbol 'LFUN-INTERNAL)))))
+                       (LFUN . (internal-lfun-operator ,(onif-symbol 'LFUN-INTERNAL)))
+                       (REG-THREAD . (internal-thread-reg-operator ,(onif-symbol 'REG-THREAD)))
+                       ))
                res)))))
 
      (define (onif-scm-env/make-env-for-library)

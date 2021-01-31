@@ -3,7 +3,7 @@
            (scheme list)
            (prefix (kallcc misc) kmisc/)
            (onif misc)
-           (onif meta-lambda))
+           (prefix (kallcc meta-lambda) kmlambda/))
    (export name-ids/make-name-local-ids)
    (begin
      (define (%make-name-local-ids bind-vars)
@@ -24,8 +24,7 @@
                  (new-body
                    (%add-meta-info-name-local-ids
                      (list-ref code 3) bind-vars onif-symbol-hash)))
-                (onif-meta-lambda/update-meta-info-body
-                  code 'local-ids name-ids new-body)))
+                (kmlambda/update-meta-info-body code 'local-ids name-ids new-body)))
          (else (map (lambda (x)
                       (%add-meta-info-name-local-ids x bind-vars
                                                      onif-symbol-hash))

@@ -24,7 +24,8 @@
            onif-misc/map-indexed
            onif-misc/var?
            onif-misc/const?
-           onif-misc/namespace-assq)
+           onif-misc/namespace-assq
+           onif-misc/reg-thread-operator?)
    (begin
      (define (onif-misc/var? obj)
        (or (symbol? obj)
@@ -71,6 +72,9 @@
 
      (define onif-misc/ref-var-operator?
        (onif-misc/make-check-onif-symbol-base-function 'ref-var))
+
+    (define onif-misc/reg-thread-operator?
+       (onif-misc/make-check-onif-symbol-base-function  'REG-THREAD))
 
      (define (onif-misc/onif-symbol-hash-ref onif-symbol-hash symbol)
         (cond

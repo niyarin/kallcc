@@ -1,5 +1,3 @@
-(include "./onif-misc.scm")
-
 (define-library (onif opt names)
    (import (scheme base) (scheme list) (onif misc) (scheme cxr))
    (export onif-opt-names/calc-use-names onif-ope-names/remove-unnecessary-define)

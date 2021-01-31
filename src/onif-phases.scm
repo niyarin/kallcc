@@ -5,17 +5,20 @@
            (only (niyarin thread-syntax) ->> ->)
            (scmspec core) (onif my-specs)
            (onif idebug) (onif symbol) (onif scm env)
-           (onif meta-lambda) (onif name-ids) (onif alpha conv) (onif flat-lambda) (onif misc)
+           (onif name-ids) (onif alpha conv) (onif flat-lambda) (onif misc)
            (onif new-asm) (onif expand) (onif cps) (onif opt names)
            (prefix (kallcc namespace) knamespace/)
-           (prefix (kallcc misc) kmisc/))
+           (prefix (kallcc regflat) kregflat/)
+           (prefix (kallcc misc) kmisc/)
+           (prefix (kallcc meta-lambda) kmlambda/))
    (export onif-phases/pre-expand onif-phases/expand-namespaces
            onif-phases/solve-imported-name onif-phases/solve-imported-symbol
            onif-phases/alpha-conv! onif-phases/first-stage
            onif-phase/meta-lambda onif-phase/make-name-local-ids
            onif-phase/flat-lambda onif-phases/cps-conv onif-phase/asm
            onif-phase/new-asm
-           onif-phase/new-asm&global)
+           onif-phase/new-asm&global
+           onif-phase/regflat)
    (begin
      (define (onif-phases/pre-expand code global)
        "Removes global begin and splites source code based on namespace."
@@ -134,7 +137,7 @@
                expanded-namespaces
                defined-symbols)))
 
-      (define %namespace-assq onif-misc/namespace-assq)
+      (define %namespace-assq knamespace/nassq)
 
       (define (onif-phases/solve-imported-symbol namespaces)
         "Return alist for import symbols. ((symbol rename-onif-symbol) ...)"
@@ -155,11 +158,10 @@
                 (namespaces ;knamespace
                   (onif-phases/pre-expand code (onif-scm-env-tiny-core)))
                 (expanded-namespaces
-                  (onif-phases/expand-namespaces (onif-misc/namespace-assq
-                                                   'body
-                                                   (car namespaces))
-                                                 (cdr namespaces);ライブラリの名前空間
-                                                 expand-environment))
+                  (onif-phases/expand-namespaces
+                    (knamespace/body (car namespaces))
+                    (cdr namespaces);ライブラリの名前空間
+                    expand-environment))
                 (alpha-converted-code
                   (begin (onif-phases/alpha-conv! expanded-namespaces global)
                          expanded-namespaces))
@@ -171,50 +173,45 @@
                               (cons* `(body ,(cddr namespace))
                                      `(name ,(car namespace))
                                       (cadr namespace))))))))
-          (map (lambda (namespace rename-alist)
-                 (->> (cadr namespace)
-                      (assq 'body)
-                      cadr
-                      (for-each (lambda (expression)
-                                    (onif-alpha/simple-conv!
-                                      expression
-                                      rename-alist
-                                      global)))))
+          (for-each
+            (lambda (namespace rename-alist)
+                (for-each (lambda (expression)
+                              (onif-alpha/simple-conv!
+                                expression
+                                rename-alist
+                                global))
+                          (knamespace/body namespace)))
                    namespaces
                    (onif-phases/solve-imported-symbol namespaces))
           namespaces))
 
       (define (onif-phases/cps-conv namespaces)
-         (->> namespaces
-              (map (lambda (namespace)
-                     (->> (%namespace-assq 'body namespace)
-                          (map (lambda (expression)
-                                  (onif-cps-conv
-                                    expression
-                                    (%namespace-assq
-                                      ;'original-syntax-symbol-hash
-                                      'syntax-symbol-hash
-                                      namespace))))
-                         ((lambda (expression)
-                            (list (car namespace)
-                                  (cons (list 'body expression)
-                                     (cadr namespace))))))))))
+        (map (lambda (namespace)
+               (knamespace/apply-body
+                 namespace
+                 (lambda (ns-body)
+                   (map (lambda (expression)
+                          (onif-cps-conv
+                             expression
+                            (%namespace-assq 'syntax-symbol-hash namespace)))
+                        ns-body))))
+             namespaces))
 
       (define (onif-phase/meta-lambda namespaces)
-        (->> namespaces
-             (map (lambda (namespace)
-                    (->> (%namespace-assq 'body namespace)
-                         (map (lambda (expression)
-                                  (onif-meta-lambda-conv
-                                      expression
-                                      (%namespace-assq
-                                        'syntax-symbol-hash
-                                        namespace)
-                                      (cadr namespace))))
-                         ((lambda (expression)
-                             (list (car namespace)
-                                   (cons (list 'body expression)
-                                         (cadr namespace))))))))))
+        (map (lambda (namespace)
+              (->> (%namespace-assq 'body namespace)
+                   (map (lambda (expression)
+                            (kmlambda/meta-lambda-conv
+                                expression
+                                (%namespace-assq
+                                  'syntax-symbol-hash
+                                  namespace)
+                                (cadr namespace))))
+                   ((lambda (body)
+                       (knamespace/update namespace
+                                          'body
+                                          body)))))
+             namespaces))
 
       (define (onif-phase/make-name-local-ids namespaces)
         (->> namespaces
@@ -304,11 +301,11 @@
                   (bodies (%new-asm-body rnamespaces global-ids-box jump-box))
                   (_ (begin (onif-idebug/debug-display (concatenate bodies))(newline)))
                   (funs (%new-asm-funs rnamespaces global-ids-box jump-box)))
-               (display "!XYZ ")(onif-idebug/debug-display global-ids-box)(newline)
                (append
                  funs
                  (concatenate bodies)
                  '((BODY-START) (HALT)))))
+
        (define (onif-phase/new-asm&global namespaces)
            (let* ((rnamespaces (reverse namespaces))
                   (global-ids-box (onif-new-asm/make-global-ids-box))
@@ -321,4 +318,13 @@
                  funs
                  (concatenate bodies)
                  '((BODY-START) (HALT)))
-               (car global-ids-box))))))
+               (car global-ids-box))))
+
+       (define (onif-phase/regflat namespaces)
+         (map (lambda (namespace)
+                (knamespace/apply-body
+                  namespace
+                  (lambda (body)
+                    (let ((symbol-env (%namespace-assq 'syntax-symbol-hash namespace)))
+                    (map (lambda (x) (kregflat/regflat x symbol-env)) body)))))
+              namespaces))))

@@ -114,8 +114,7 @@
                   (cons (cadr (%expand-environment-syntax-symbol-hash-ref
                                  'begin expand-environment))
                         bodies))))
-          (list (cadr (%expand-environment-syntax-symbol-hash-ref
-                     'lambda expand-environment))
+          (list (cadr (%expand-environment-syntax-symbol-hash-ref 'lambda expand-environment))
                 (cadr scm-code)
                 body)))
 
