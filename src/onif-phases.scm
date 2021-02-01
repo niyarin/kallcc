@@ -10,7 +10,8 @@
            (prefix (kallcc namespace) knamespace/)
            (prefix (kallcc regflat) kregflat/)
            (prefix (kallcc misc) kmisc/)
-           (prefix (kallcc meta-lambda) kmlambda/))
+           (prefix (kallcc meta-lambda) kmlambda/)
+           (prefix (kallcc additional-tags) katags/))
    (export onif-phases/pre-expand onif-phases/expand-namespaces
            onif-phases/solve-imported-name onif-phases/solve-imported-symbol
            onif-phases/alpha-conv! onif-phases/first-stage
@@ -18,6 +19,7 @@
            onif-phase/flat-lambda onif-phases/cps-conv onif-phase/asm
            onif-phase/new-asm
            onif-phase/new-asm&global
+           onif-phases/add-additional-tags
            onif-phase/regflat)
    (begin
      (define (onif-phases/pre-expand code global)
@@ -327,4 +329,16 @@
                   (lambda (body)
                     (let ((symbol-env (%namespace-assq 'syntax-symbol-hash namespace)))
                     (map (lambda (x) (kregflat/regflat x symbol-env)) body)))))
-              namespaces))))
+              namespaces))
+
+
+       (define (onif-phases/add-additional-tags namespaces)
+         (map (lambda (namespace)
+                (knamespace/apply-body
+                  namespace
+                  (lambda (body)
+                    (map (lambda (expression)
+                           (katags/add-simple-procedure-tag expression (%namespace-assq 'syntax-symbol-hash namespace)))
+                         body))))
+              namespaces))
+       ))

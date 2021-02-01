@@ -10,8 +10,11 @@
    (export meta-lambda-conv
            update-meta-info
            update-body
-           update-meta-info-body)
-
+           update-meta-info-body
+           meta-lambda-meta-info
+           meta-lambda-body
+           remove-meta-info
+           re-update-stack)
    (begin
     (define %lambda-meta-operator? onif-misc/lambda-meta-operator?)
 
@@ -34,6 +37,11 @@
      (define (update-meta-info meta-lambda-code key val)
         (kmisc/list-update meta-lambda-code
                            2 (cons (list key val) (caddr meta-lambda-code))))
+
+     (define (remove-meta-info meta-lambda-code key)
+       (kmisc/list-update meta-lambda-code
+                          2 (remove (lambda (x) (eq? (car x) key))
+                                    (meta-lambda-meta-info meta-lambda-code))))
 
      (define (update-body meta-lambda-code new-body)
        (kmisc/list-update meta-lambda-code 3 new-body))
@@ -93,9 +101,28 @@
            (map (lambda (x) (%conv-meta-lambda x onif-symbol-hash stk onif-expand-env))
                 cps-code))))
 
+     (define (re-update-stack cps-code onif-symbol-hash stk)
+       (cond
+         ((not-pair? cps-code) cps-code)
+         ((onif-misc/lambda-meta-operator? (car cps-code) onif-symbol-hash)
+          (let* ((new-stk (cons (kmisc/formals->list (cadr cps-code))
+                                stk))
+                 (new-body (re-update-stack (meta-lambda-body cps-code) onif-symbol-hash new-stk)))
+            (update-meta-info-body cps-code 'stack stk new-body)))
+         (else
+           (map (lambda (x) (re-update-stack x onif-symbol-hash stk)) cps-code))))
+
+     (define (meta-lambda-body meta-lambda)
+       (list-ref meta-lambda 3))
+
+     (define (meta-lambda-meta-info meta-lambda)
+       (list-ref meta-lambda 2))
+
      (define (meta-lambda-conv  cps-code onif-symbol-hash onif-expand-env-with-name-id)
        (%conv-meta-lambda
          cps-code
          onif-symbol-hash
          '()
-         onif-expand-env-with-name-id))))
+         onif-expand-env-with-name-id))
+
+     ))

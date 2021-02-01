@@ -118,6 +118,7 @@
         ((CAR)
          (let* ((a1 (cadr (car code)))
                 (a2 (list-ref (car code) 2)))
+            (unless (pair? (%ref a1 (car funs-box) registers (car global-box))) (error "Error:Pair required" (%ref a1 (car funs-box) registers (car global-box)) (car code) (cdr code)))
             (%set! a2
                    (car (%ref a1 (car funs-box) registers (car global-box)))
                    funs-box registers global-box))
@@ -138,15 +139,11 @@
                 (index (%ref a2 (car funs-box) registers (car global-box))))
 
           (unless (eq? (vector-ref vec 0) 'VECTOR)
-
-                  (display 
-          (vector-map
-            (lambda (x)  (my-display x))
-            registers))(newline)
+                  (display (vector-map (lambda (x)  (my-display x)) registers))(newline)
                   (error "INVALID VECTOR!"))
-            (%set! a3
-                   (vector-ref  vec (+ index 1))
-                   funs-box registers global-box))
+          (when (>= (+ index 1) (vector-length vec))
+            (error "Error:index out of range" code (+ index 1) (vector-length vec) vec))
+          (%set! a3 (vector-ref vec (+ index 1)) funs-box registers global-box))
          (cdr code))
         ((VECTOR-SET-INIT! VECTOR-SET!)
          (let* ((a1 (cadr (car code)))
@@ -251,18 +248,18 @@
           (if test
             (move-to-else (cdr code) a2)
             (cdr code))))
-        ((BODY-START)
-         (set-car! bp-box (%search-next-code (cdr code)))
-         (display (car bp-box))(newline)
-         (cdr code))
-        ((CALL)
-         (unless (or (null? (vector-ref registers 0))
-                     (eq? (vector-ref (vector-ref registers 0) 0) 'CLOSURE)) (error "CLOSURE!"))
-         (if (null? (vector-ref registers 0))
-           (car bp-box)
-           (vector-ref (vector-ref registers 0) 2)))
-        ((COMMENT) (cdr code))
-        (else (display "!")(display (car code))(newline) (exit))))
+     ((BODY-START)
+      (set-car! bp-box (%search-next-code (cdr code)))
+      (display (car bp-box))(newline)
+      (cdr code))
+     ((CALL)
+     (unless (or (null? (vector-ref registers 0))
+                 (eq? (vector-ref (vector-ref registers 0) 0) 'CLOSURE)) (error "CLOSURE!"))
+     (if (null? (vector-ref registers 0))
+       (car bp-box)
+       (vector-ref (vector-ref registers 0) 2)))
+    ((COMMENT) (cdr code))
+    (else (display "!")(display (car code))(newline) (exit))))
 
     (define (run-interpreter code global-id-alist)
       (%make-ref-function! global-id-alist)
@@ -275,5 +272,5 @@
             ;(display (car code))(newline)
             (loop (%apply code funs-box registers global-box bp-box global-id-alist))))
 
-        (display "RES = ")(display (vector-ref registers 2))(newline)
+        (display "RES (R 2) = ")(display (vector-ref registers 2))(newline)
         ))))

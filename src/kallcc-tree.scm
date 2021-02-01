@@ -20,8 +20,9 @@
       (let loop ((tree tree))
         (cond
           ((list? tree)
-           (map (lambda (x)
-                 (let ((y (loop x)))
-                   (if (pred y) (update-proc y) y)))
-               tree))
+           (let ((tree* (if (pred tree) (update-proc tree) tree)))
+             (map (lambda (x)
+                   (let ((y (loop x)))
+                     (if (pred y) (update-proc y) y)))
+                 tree*)))
           (else tree))))))

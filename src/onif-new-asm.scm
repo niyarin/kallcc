@@ -4,6 +4,7 @@
            (onif idebug) (onif symbol) (onif misc)
            (only (niyarin thread-syntax) ->> ->)
            (prefix (kallcc misc) kmisc/)
+           (prefix (kallcc meta-lambda) kmlambda/)
            (scheme write);
            )
    (export onif-new-asm/make-global-ids-box onif-new-asm/convert onif-new-asm/tune
@@ -66,7 +67,8 @@
           => (lambda (l)
                `((COMMENT ((R ,to-register-offset) <= ,(onif-idebug-icode->code var)))
                  (SET! (R ,to-register-offset) (R ,(cadr l))))))
-         ((list (list 'SET!
+         ((list `(COMMENT ,(if (symbol? var) (symbol->string var) (onif-symbol->symbol var)))
+                (list 'SET!
                       `(R ,to-register-offset)
                       (%global-ref! var global-ids-box))))))
 
@@ -122,7 +124,7 @@
                                 (R ,addr-reg)
                                 (R ,to-register-offset)))))
           (when (eq? env-reg addr-reg) (error "! SAME ADDR CLS"))
-          (append  null-set make-closure-addr make-closure)))
+          (append null-set make-closure-addr make-closure)))
 
      (define (%asm-byte-vector bv to-register-offset lock-registers)
        ;;外側という前提
@@ -194,7 +196,7 @@
                (if (null? (cadr code))
                  `((SET! (R ,to-register-offset) ()))
                  (error "TBW!")))
-           (else (error "TBW33" (onif-idebug-icode->code code)))))
+           (else (error "UNSUPPORTED ARGUMENT::" (onif-idebug-icode->code code)))))
 
      (define (%asm-args args use-registers to-register-offset
                         lock-registers local-register global-ids-box onif-symbol-hash)
@@ -243,6 +245,45 @@
                   ;(SET! (R 0) ())
                   (CALL 1)))))))
 
+     (define (%asm-reg-thread code register-offset
+                              use-registers lock-registers local-registers
+                              global-ids-box onif-symbol-hash)
+       (let ((cont (cadr code))
+             (res (kmisc/make-tconc))
+             (thread-operation (list-ref code 2)))
+         ;;処理済みのリスト
+         (let loop ((ls thread-operation)
+                    (roffset register-offset)
+                    (local-registers local-registers)
+                    (lock-registers lock-registers))
+           (if (null? ls)
+             (begin (kmisc/tconc-push! res `(SET! (R 2) (R ,(cadr (assq '() local-registers)))))
+
+                    (append (%asm-arg1 cont use-registers register-offset
+                                        lock-registers local-registers global-ids-box
+                                        onif-symbol-hash)
+                            '((COMMENT "THREAD-START"))
+                           (kmisc/tconc-head res)
+                           '((COMMENT "THREAD-END"))
+                           '((CALL 1))))
+             (let* ((var (caar ls))
+                    (code (cadr (car ls)))
+                    (_ (begin (display "#:")(onif-idebug/debug-display (car ls))(newline)))
+                    (ope (onif-misc/ref-operations (car code) onif-symbol-hash))
+                    (dust-reg (%safety-register roffset 0 lock-registers))
+                    (var-reg (%safety-register roffset 0 (cons dust-reg lock-registers))))
+                (for-each
+                  (lambda (x) (kmisc/tconc-push! res x))
+                  (%asm-operator ope code use-registers roffset
+                                 lock-registers local-registers global-ids-box
+                                 onif-symbol-hash
+                                 '(include-cont . #f)))
+              (loop (cdr ls)
+                    (+ roffset 1)
+                    (cons (list var var-reg)
+                          local-registers)
+                    (cons lock-registers var-reg)))))))
+
      (define (%asm-if code register-offset use-registers
                       lock-registers local-register jump-box env global-ids-box onif-symbol-hash)
         (onif-idebug/debug-display code)(newline)
@@ -265,8 +306,13 @@
                   true
                   `((ENDIF ,jsymbol)))))
 
-     (define (%asm-operator ope code use-registers register-offset lock-registers local-register global-ids-box onif-symbol-hash)
-        (let* ((args (%asm-args (cdr code) use-registers register-offset lock-registers local-register global-ids-box onif-symbol-hash))
+     (define (%asm-operator ope code use-registers register-offset lock-registers local-register global-ids-box onif-symbol-hash . opt)
+        (let* ((include-cont (cond ((assq 'include-cont opt) => cdr) (else #t)))
+               (args (if include-cont
+                       (%asm-args (cdr code) use-registers register-offset
+                                  lock-registers local-register global-ids-box onif-symbol-hash)
+                       (%asm-args (cddr code) use-registers (+ register-offset 1)
+                                  lock-registers local-register global-ids-box onif-symbol-hash)))
                (cont (%safety-register register-offset 0 lock-registers))
                (r1 (%safety-register register-offset 0 (cons cont lock-registers)))
                (r2 (%safety-register register-offset 0 (cons* cont r1 lock-registers)))
@@ -341,7 +387,7 @@
                 (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
                 (BYTEVECTOR-U8-REF (R ,r1) (R ,r2) (R ,r3))
                 (SET! (R ,r1) (R ,r3))))
-            ((BYTEVECTOR-U8-SET!)
+            ((BYEVECTOR-U8-SET!)
                `(,@args
                 (COMMENT ARGS "^" ,ope ,(onif-idebug-icode->code (cddr code)))
                 (BYTEVECTOR-U8-SET! (R ,r1) (R ,r2) (R ,r3))
@@ -372,7 +418,8 @@
                               local-register global-ids-box onif-symbol-hash)))
           (append '((COMMENT "FUN CALL")) args op mvs `((CALL ,(length (cdr code)))))))
 
-     (define (onif-new-asm/convert code use-registers register-offset lock-registers local-register env
+     (define (onif-new-asm/convert code use-registers register-offset
+                                   lock-registers local-register env
                                    global-ids-box jump-box onif-symbol-hash)
        (cond
          ((or (onif-misc/const? code)
@@ -384,6 +431,13 @@
           (%asm-define code use-registers register-offset lock-registers local-register global-ids-box onif-symbol-hash))
          ((onif-misc/if-operator? (car code) onif-symbol-hash)
           (%asm-if code register-offset use-registers lock-registers local-register jump-box env global-ids-box onif-symbol-hash))
+         ((onif-misc/reg-thread-operator? (car code) onif-symbol-hash)
+          (let ((res
+          (%asm-reg-thread code register-offset  use-registers
+                           lock-registers local-register global-ids-box onif-symbol-hash)))
+            (display "FROM::")(onif-idebug/debug-display code)(newline)
+            (display "TO::")(display res)(newline)
+            res))
          ((onif-misc/ref-operations (car code) onif-symbol-hash)
           => (lambda (ope)
                (append
@@ -410,26 +464,30 @@
                (map (lambda (e) (if (pair? e) e (list e))))
                concatenate
                (filter onif-misc/var?)))
+         ((onif-misc/reg-thread-operator? (car body) onif-symbol-hash)
+          (filter onif-misc/var? (concatenate (list-ref body 2))))
          ((onif-misc/ref-operations (car body) onif-symbol-hash)
           (filter onif-misc/var? (cdr body)))
          (else (filter onif-misc/var? body)))))
 
    (define (%%ref-use-free-vars body frame stack onif-symbol-hash)
-      (let ((use-vars
+     ;;thread-regに対応していない..
+      (let ((global-or-free-vars
               (lset-difference eq?
                                (%ref-use-vars body onif-symbol-hash) frame)))
          (filter-map
            (lambda (var)
-                (->> (filter-map
+                (->> (filter-map;;コールスタックを見ていってヒットするか調べる
                        (lambda (cell index)
                           (let ((l-index (list-index (lambda (x) (eq? var x))
                                                      cell)))
+                            (display "L-index:")(display l-index)(display cell)(newline)(newline)
                             (if l-index (list var index l-index) #f)))
                         stack
                         (iota (length stack)))
                      ((lambda (x)
                        (if (null? x) #f (car x))))))
-              use-vars)))
+              global-or-free-vars)))
 
    (define (%ref-use-free-vars body frame stack onif-symbol-hash)
       (let ((free-vars (%%ref-use-free-vars body frame stack onif-symbol-hash)))
@@ -472,17 +530,17 @@
                                      (R ,(cadr (assq (caar ls) register-map))))
                         rev-res))))))
 
-   (define (%asm-fun-header function-id formals body)
+   (define (%asm-fun-header function-id formals body skip-env)
       `((DEFUN ,(%make-symbol "FUN" function-id))
         (COMMENT (lambda ,(onif-idebug-icode->code formals) ,(onif-idebug-icode->code body)))
-        (CLOSURE-ENV (R 0) (R 1))
+        ,@(if skip-env '((COMMENT "SKIP REF CLOSURE-ENV")) '((CLOSURE-ENV (R 0) (R 1))))
         (COMMENT (list formals ,(onif-idebug-icode->code formals)))))
 
-   (define (%asm-fun-free-vars meta-function lock-registers symbol-hash)
-      (let* ((formals (cadr meta-function))
+   (define (%asm-fun-free-vars meta-procedure lock-registers symbol-hash)
+      (let* ((formals (cadr meta-procedure))
              (formals-length (length formals))
-             (body (list-ref meta-function 3))
-             (local-stack (cadr (assq 'stack (list-ref meta-function 2))));;NOT CONTAIN THIS CELL
+             (body (list-ref meta-procedure 3))
+             (local-stack (cadr (assq 'stack (list-ref meta-procedure 2))));;NOT CONTAIN THIS CELL
              (free-vars (%ref-use-free-vars body formals local-stack symbol-hash))
              (registers-for-free-vars (map (lambda (x) (+ x formals-length 2)) (iota (length free-vars))))
              (free-vars-local-register (map (lambda (free-var-box rnum) (list (car free-var-box) rnum))
@@ -499,9 +557,9 @@
              (phase1-lock-registers (append registers-for-free-vars lock-registers)))
         (values free-vars-expand free-vars-local-register phase1-lock-registers (length free-vars))))
 
-   (define (%asm-fun-make-env-frame meta-function local-registers lock-registers)
-     (let* ((body (list-ref meta-function 3))
-            (formals (cadr meta-function))
+   (define (%asm-fun-make-env-frame meta-procedure local-registers lock-registers)
+     (let* ((body (list-ref meta-procedure 3))
+            (formals (cadr meta-procedure))
             (formals-length (length formals))
             (formals-regs (map (lambda (x) (+ x 2))
                                (iota formals-length)))
@@ -522,8 +580,8 @@
 
    (define (%asm-fun-lset id-fun use-registers register-offset lock-registers local-register
                           env global-ids-box jump-box onif-symbol-hash)
-    (let* ((meta-function (cadr id-fun))
-           (body (list-ref meta-function 3)))
+    (let* ((meta-procedure (cadr id-fun))
+           (body (list-ref meta-procedure 3)))
       (let*-values (((free-vars-expand phase1-local-registers phase1-lock-registers phase1-register-shift)
                        (%asm-fun-free-vars (cadr id-fun) lock-registers onif-symbol-hash))
                     ((make-env-frame phase2-local-registers phase2-lock-registers phase2-register-shift)
@@ -532,7 +590,7 @@
                  (%safety-register (+ phase1-register-shift
                                       phase2-register-shift 2)
                                    0 phase2-lock-registers)))
-            (append (%asm-fun-header (car id-fun) (cadr meta-function) (list-ref meta-function 3))
+            (append (%asm-fun-header (car id-fun) (cadr meta-procedure) (list-ref meta-procedure 3) #f)
                     free-vars-expand
                     make-env-frame
                     (list `(CONS (R 0) (R 1) (R ,another-register));そのあたらしいフレームを持ってきた環境にCONS
@@ -550,22 +608,26 @@
                        (%asm-fun-free-vars (cadr id-fun) lock-registers onif-symbol-hash))
                     ((make-env-frame phase2-local-registers phase2-lock-registers phase2-register-shift)
                      (%asm-fun-make-env-frame (cadr id-fun) phase1-local-registers  phase1-lock-registers)))
-        (let* ((meta-function (cadr id-fun))
+        (let* ((meta-procedure (cadr id-fun))
+               (meta-info (kmlambda/meta-lambda-meta-info meta-procedure))
+               (simple-procedure (begin (kmisc/assq-cadr-default 'simple-procedure meta-info #f) #f))
                (another-register
                  (%safety-register (+ phase1-register-shift
                                       phase2-register-shift 2)
                                    0 phase2-lock-registers))
                (asm-body
-                 (onif-new-asm/convert (list-ref meta-function 3) use-registers register-offset
+                 (onif-new-asm/convert (list-ref meta-procedure 3) use-registers register-offset
                                        phase2-lock-registers
                                        phase2-local-registers
-                                       (cons (list-ref meta-function 2) env)
+                                       (cons (list-ref meta-procedure 2) env)
                                        global-ids-box jump-box onif-symbol-hash)))
-           (append (%asm-fun-header (car id-fun) (cadr meta-function) (list-ref meta-function 3))
+           (append (%asm-fun-header (car id-fun) (cadr meta-procedure) (list-ref meta-procedure 3) simple-procedure)
                    free-vars-expand
-                   make-env-frame
-                   (list `(CONS (R 0) (R 1) (R ,another-register));そのあたらしいフレームを持ってきた環境にCONS
-                         `(SET! (R 1) (R ,another-register)))
+                   '((COMMENT "MAKE-ENV-FRAME"))
+                   (if simple-procedure '((COMMENT "SKIP-ENV-FRAME")) make-env-frame)
+                   (if simple-procedure '((COMMENT "SKIP-ADD-FRAME"))
+                                         (list `(CONS (R 0) (R 1) (R ,another-register));そのあたらしいフレームを持ってきた環境にCONS
+                                               `(SET! (R 1) (R ,another-register))))
                    (cons '(COMMENT "FUNCTION BODY") asm-body)))))
 
    (define (onif-new-asm/asm-fun functions use-registers register-offset
@@ -573,6 +635,7 @@
                                  global-ids-box jump-box onif-symbol-hash)
      (append-map
        (lambda (id-fun)
+         (display "ipt::")(onif-idebug/debug-display id-fun)(newline)
          (let ((body (list-ref (cadr id-fun) 3)))
           (if (and (pair? body)
                    (onif-misc/local-set!-operator?  (car body) onif-symbol-hash))

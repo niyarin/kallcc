@@ -4,15 +4,18 @@
           (scheme write);
           (scheme hash-table);
           (onif idebug);
+          (onif misc)
+          (prefix (kallcc meta-lambda) kmlambda/)
+          (prefix (kallcc tree) ktree/)
           (prefix (kallcc symbol) ksymbol/)
           (prefix (kallcc misc) kmisc/))
   (export regflat)
   (begin
-
     (define (%simple-ope? ope)
       (and (ksymbol/kallcc-symbol? ope)
            (case (ksymbol/ref-symbol ope)
-              ((CONS CAR CDR REG-THREAD) #t)
+              ((CONS CAR CDR FX+ FX- FX* FX=? FX<? FXQUOTIENT FXREMAINDER
+                REG-THREAD) #t)
               (else #f))))
 
     (define (%drop-cont expression)
@@ -28,17 +31,23 @@
               new-body)
         cont-lambda))
 
-    (define (%new-thread thread-op cont-name code next)
+    (define (%remove-stack-info code kallcc-symbol-hash)
+      (ktree/update
+        (lambda (x) (and (pair? x) (onif-misc/lambda-meta-operator? (car x) kallcc-symbol-hash)))
+        (lambda (x) (kmlambda/remove-meta-info x 'stack))
+        code))
+
+    (define (%new-thread thread-op cont-name code next symbol-hash)
       (if (and (pair? next) (eq? (car next) thread-op))
         (list thread-op
               (cadr next)
               (cons (list cont-name (%drop-cont code))
                     (list-ref next 2)))
-        (list thread-op (cadr next)
+        (list thread-op (%remove-stack-info (cadr next) symbol-hash)
                         (list (list cont-name (%drop-cont code))
                               (list '() (%drop-cont next))))))
 
-    (define (regflat-loop code thread-op)
+    (define (regflat-loop code thread-op symbol-env)
       (let loop ((code code))
         (let ((operator (and (pair? code)
                              (ksymbol/kallcc-symbol? (car code))
@@ -55,12 +64,13 @@
                     (cadr code)
                     (list-ref code 2)
                     (loop (list-ref code 3))))
-            ((CONS CAR CDR THREAD>)
+            ((CONS CAR CDR FX+ FX- FX* FX=? FX<? FXQUOTIENT FXREMAINDER
+                     REG-THREAD)
              (let* ((next (and (pair? (cadr code))
                                (loop (%cont-decompose (cadr code))))))
                (if (and (pair? next)
                         (%simple-ope? (car next)))
-                 (%new-thread thread-op (car (cadr (cadr code))) code next)
+                 (%new-thread thread-op (car (cadr (cadr code))) code next symbol-env)
                  (cons* (car code)
                         (%update-cont (cadr code) next)
                         (cddr code)))))
@@ -70,13 +80,10 @@
 
     (define (regflat expression symbol-env)
       (let ((thread-op (cadr (hash-table-ref symbol-env 'REG-THREAD))))
-        (display "IN: ")(onif-idebug/debug-display expression '(not-contain-meta-info #t))(newline)
-        (let ((out  (regflat-loop expression thread-op)))
-          (newline)(display "OUT:")
-          (if (eq? (and (pair? out) (car out)) thread-op)
-            (begin (display "{")(display ":op , ")(onif-idebug/debug-display (list-ref out 2) '(not-contain-meta-info #t))(newline)
-                    (display ":cont , ")(onif-idebug/debug-display  (list-ref out 1) '(not-contain-meta-info #t))(display "}"))
-            (onif-idebug/debug-display out '(not-contain-meta-info #t)))
-          (newline)
-        out)))
+        (display "IN: ")(onif-idebug/debug-display expression )(newline)
+        (let* ((res  (regflat-loop expression thread-op symbol-env))
+               (res* (kmlambda/re-update-stack res symbol-env '())))
+        (display "MID: ")(onif-idebug/debug-display res)(newline)
+        (display "OUT: ")(onif-idebug/debug-display res*)(newline)
+          res*)))
       ))

@@ -94,4 +94,4 @@
       (cond ((assq key alist) => cdr) (else default)))
 
     (define (assq-cadr-default key alist default)
-      (cond ((assq key alist) => cdr) (else default)))))
+      (cond ((assq key alist) => cadr) (else default)))))
