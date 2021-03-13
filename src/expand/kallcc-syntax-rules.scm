@@ -1,5 +1,4 @@
-
-(define-library (onif syntax-rules)
+(define-library (kallcc expand syntax-rules)
    (import (scheme base)
            (niyarin rules))
    (export onif-syntax-rules/make-syntax-rules onif-syntax-rules/expand

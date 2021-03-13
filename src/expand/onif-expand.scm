@@ -4,7 +4,7 @@
            (scheme hash-table) (scheme comparator)
            (scheme cxr)
            (onif scm env) (onif misc) (onif symbol)
-           (onif syntax-rules)
+           (kallcc expand syntax-rules)
            (onif idebug)
            (niyarin thread-syntax)
            (prefix (kallcc misc) kmisc/)
