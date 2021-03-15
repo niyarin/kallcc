@@ -1,0 +1,10 @@
+(define-library (kallcc expand preprocess)
+  (import (scheme base) (scheme list)
+          (onif misc))
+  (export remove-outer-begin)
+  (begin
+     (define (remove-outer-begin scm-code global)
+       (let remove-begin ((code scm-code))
+         (if (and (pair? code) (onif-misc/begin-operator? (car code) global))
+           (append-map remove-begin (cdr code))
+           (list code))))))

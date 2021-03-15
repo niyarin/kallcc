@@ -1,4 +1,3 @@
-
 (define-library (onif phases)
    (import (scheme base) (scheme list) (scheme cxr) (srfi 69);scheme hash
            (scheme write);
@@ -8,6 +7,7 @@
            (onif name-ids) (onif alpha conv) (onif flat-lambda) (onif misc)
            (onif new-asm) (onif expand) (onif cps) (onif opt names)
            (prefix (kallcc namespace) knamespace/)
+           (prefix (kallcc expand preprocess) kepreprocess/)
            (prefix (kallcc regflat) kregflat/)
            (prefix (kallcc misc) kmisc/)
            (prefix (kallcc meta-lambda) kmlambda/)
@@ -31,7 +31,7 @@
           (let* ((expression-begin-removed
                    (append-map
                      (lambda (expression)
-                       (onif-expand/remove-outer-begin expression global))
+                       (kepreprocess/remove-outer-begin expression global))
                      code)))
              (onif-expand/separate-namespaces expression-begin-removed global))))
 
@@ -312,13 +312,14 @@
            (let* ((rnamespaces (reverse namespaces))
                   (global-ids-box (onif-new-asm/make-global-ids-box))
                   (jump-box (list 0))
-                  (bodies (%new-asm-body rnamespaces global-ids-box jump-box))
-                  (_ (begin (onif-idebug/debug-display (concatenate bodies))(newline)))
+                  (bodies  (remove (lambda (x) (eq? (car x) 'CONCATENATE-BODY))
+                                   (onif-new-asm/tune (concatenate (%new-asm-body rnamespaces global-ids-box jump-box)))))
+                  (_ (begin (onif-idebug/debug-display bodies)(newline)))
                   (funs (%new-asm-funs rnamespaces global-ids-box jump-box)))
             (values
                (append
                  funs
-                 (concatenate bodies)
+                 bodies
                  '((BODY-START) (HALT)))
                (car global-ids-box))))
 

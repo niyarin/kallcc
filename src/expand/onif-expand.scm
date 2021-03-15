@@ -9,6 +9,7 @@
            (niyarin thread-syntax)
            (prefix (kallcc misc) kmisc/)
            (prefix (kallcc symbol) ksymbol/)
+           (prefix (kallcc namespace) knamespace/)
            (prefix (kallcc util namespace) kunamespace/)
            (scmspec core)
            (scheme write);DEBUG
@@ -298,26 +299,16 @@
 
      (define onif-expand onif-expand/expand)
 
-     (define (onif-expand/remove-outer-begin scm-code global)
-       (let remove-begin ((code scm-code))
-         (cond
-           ((not-pair? code)
-            (list code))
-           ((eq? 'built-in-begin
-                (car (%lookup-environment (car code) global '())))
-            (append-map remove-begin (cdr code)))
-           (else
-             (list code)))))
 
      (define (onif-expand/separate-namespaces expressions global)
-       (let-values (((namespaces this-expressions)
-                        (partition
+       (let-values (((namespaces global-code)
+                       (partition
                           (lambda (x)
                             (and (pair? x)
                                  (eq? 'built-in-define-library
                                       (car (%lookup-environment (car x) global '())))))
                           expressions)))
-            (cons `(() ((body ,this-expressions)))
+            (cons `(() ((body ,global-code)))
                   (map (lambda (define-library-code)
                          `(,(cadr define-library-code)
                            ((body ,(cddr define-library-code)))))
@@ -335,8 +326,7 @@
 
       (define (onif-expand/define-syntax-expression? expression global)
         (and (pair? expression)
-             (let ((ope (%lookup-environment (car expression) global '())))
-               (and (pair? ope) (eq? 'built-in-define-syntax (car ope))))))
+             (onif-misc/define-operator? (car expression) global)))
 
      (define (onif-expand-environment)
         `((syntax-symbol-hash ,(onif-scm-env-tiny-core))))
@@ -359,17 +349,15 @@
          res))
 
      (define (%namespace->export-global namespace)
-         (let* ((exports (onif-misc/namespace-assq 'export-symbols namespace '()))
-                (syntax-symbol-hash (onif-misc/namespace-assq 'syntax-symbol-hash namespace));;名前変えたい
-                )
+         (let* ((exports (knamespace/nassq 'export-symbols namespace '()))
+                (global (knamespace/nassq 'syntax-symbol-hash namespace)))
             (alist->hash-table
                (->> exports
                     (filter (lambda (symbol)
-                              (hash-table-contains? syntax-symbol-hash
-                                                    symbol)))
+                              (hash-table-contains? global symbol)))
                     (map (lambda (symbol)
                            (cons symbol
-                                 (hash-table-ref syntax-symbol-hash symbol)))))
+                                 (hash-table-ref global symbol)))))
                eq?)))
 
      (define (onif-expand/make-environment lib-names other-namespaces)
