@@ -3,7 +3,6 @@
            (scheme list)
            (srfi 125)
            (scheme write)
-           (onif idebug);
            (onif symbol))
    (export onif-misc/make-check-onif-symbol-base-function
            onif-misc/lambda-operator?

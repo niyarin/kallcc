@@ -1,3 +1,5 @@
+(include "./lib/thread-syntax.scm")
+(include "./lib/scmspec.scm")
 (include "./onif-symbol.scm")
 (include "./kallcc-symbol.scm")
 (include "./kallcc-misc.scm")
