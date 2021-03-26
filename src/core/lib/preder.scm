@@ -2,7 +2,8 @@
   (import (scheme base))
   (export (rename and* and)
           (rename not* not)
-          (rename or* or))
+          (rename or* or)
+          (rename eq?* eq?))
   (begin
     (define (and* . args)
       (lambda (x)
@@ -19,6 +20,10 @@
             ((null? args) #f)
             (((car args) x) #t)
             (else (loop (cdr args)))))))
+
+    (define (eq?* obj)
+      (lambda (x)
+        (eq? obj x)))
 
     (define (not* pred)
       (lambda (x) (not (pred x))))))
