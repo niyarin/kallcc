@@ -1,0 +1,11 @@
+(define-library (kallcc expand expand)
+  (import (scheme base) (scheme list)
+          (prefix (niyarin preder) p/)
+          (prefix (kallcc symbol) ksymbol/)
+          (prefix (kallcc expand library) ke-library/)
+          (prefix (kallcc expand library) ke-library/))
+  (export expandable-library?)
+  (begin
+    (define (expandable-library? library libraries)
+      (every (lambda (libname) (any (p/equal? libname) libraries))
+             (ke-library/lassq 'import-name-only library)))))

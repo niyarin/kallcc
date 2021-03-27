@@ -6,10 +6,11 @@
    (begin
      (define *id-counter* 0)
      (define-record-type <onif-symbol>
-         (%onif-symbol base-symbol id)
+         (%onif-symbol base-symbol id decorator)
          onif-symbol?
          (base-symbol %onif-symbol-ref-base-symbol)
-         (id %onif-symbol-ref-id))
+         (id %onif-symbol-ref-id)
+         (decorator %decorator-ref))
 
      (define onif-symbol/onif-symbol? onif-symbol?)
 
@@ -18,7 +19,8 @@
      (define onif-symbol
        (case-lambda
          (() (onif-symbol '_))
-         ((base-symbol)
+         ((base-symbol) (onif-symbol base-symbol #f))
+         ((base-symbol decorator)
           (unless (or (symbol? base-symbol)
                       (onif-symbol? base-symbol))
                   (error "The argument of onif-symbol must be symbol." base-symbol))
@@ -27,7 +29,7 @@
             (let ((base-symbol* (if (onif-symbol? base-symbol)
                                   (%onif-symbol-ref-base-symbol base-symbol)
                                   base-symbol)))
-            (%onif-symbol base-symbol* *id-counter*))))))
+            (%onif-symbol base-symbol* *id-counter* decorator))))))
 
       (define (onif-symbol->symbol osym);naive
         (string-append
